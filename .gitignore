@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+
+# Database
+*.db
+*.sqlite
+backend/data/*.db
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# Data
+backend/data/raw/*
+backend/data/imports/*
+backend/data/exports/*
+data/exports/*
+
+# Models
+backend/app/ml/model_store/*.joblib
+backend/app/ml/model_store/*.pkl
+
+# OS
+.DS_Store
+Thumbs.db

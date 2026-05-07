@@ -1,0 +1,4 @@
+item_name,brand,shop,location,price,quantity,unit,observed_at,source
+Mealie meal,Breakfast,Shoprite,Lusaka,280,25,kg,2026-05-05,manual
+Cooking oil,Generic,Local shop,Lusaka,95,2,litre,2026-05-05,manual
+Sugar,Generic,Market,Lusaka,55,2,kg,2026-05-05,manual
