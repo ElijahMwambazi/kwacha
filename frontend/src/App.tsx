@@ -4,6 +4,7 @@ import { getAnalyticsSummary } from "./api/analytics";
 import { addBasketItem, getBasketTotal, listBasketItems } from "./api/basket";
 import { createItem, listItems } from "./api/items";
 import { createPriceObservation, listPriceObservations } from "./api/prices";
+import { downloadCsv, type ExportKind } from "./api/export";
 import type { AnalyticsSummary } from "./types/analytics";
 import type { BasketItem, BasketTotal } from "./types/basket";
 import type { Item } from "./types/item";
@@ -235,6 +236,20 @@ export default function App() {
     }
   }
 
+  async function handleExport(kind: ExportKind) {
+    setError(null);
+
+    try {
+      await downloadCsv(kind);
+    } catch (currentError) {
+      setError(
+        currentError instanceof Error
+          ? currentError.message
+          : "Failed to export CSV",
+      );
+    }
+  }
+
   return (
     <main className="min-h-screen bg-[#f8f4ea] px-4 py-6 text-[#1f1f1f] sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl">
@@ -252,12 +267,35 @@ export default function App() {
             </p>
           </div>
 
-          <button
-            className="w-fit rounded-xl border border-[#d8cdb7] bg-[#fffdf8] px-4 py-2.5 font-bold text-[#1f1f1f] shadow-sm transition hover:bg-white"
-            onClick={() => void refreshData()}
-          >
-            Refresh
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              className="w-fit rounded-xl border border-[#d8cdb7] bg-[#fffdf8] px-4 py-2.5 font-bold text-[#1f1f1f] shadow-sm transition hover:bg-white"
+              onClick={() => void refreshData()}
+            >
+              Refresh
+            </button>
+
+            <button
+              className="w-fit rounded-xl border border-[#d8cdb7] bg-[#fffdf8] px-4 py-2.5 font-bold text-[#1f1f1f] shadow-sm transition hover:bg-white"
+              onClick={() => void handleExport("items")}
+            >
+              Export items
+            </button>
+
+            <button
+              className="w-fit rounded-xl border border-[#d8cdb7] bg-[#fffdf8] px-4 py-2.5 font-bold text-[#1f1f1f] shadow-sm transition hover:bg-white"
+              onClick={() => void handleExport("prices")}
+            >
+              Export prices
+            </button>
+
+            <button
+              className="w-fit rounded-xl border border-[#d8cdb7] bg-[#fffdf8] px-4 py-2.5 font-bold text-[#1f1f1f] shadow-sm transition hover:bg-white"
+              onClick={() => void handleExport("basket")}
+            >
+              Export basket
+            </button>
+          </div>
         </header>
 
         {error ? (
