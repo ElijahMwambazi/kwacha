@@ -1,5 +1,3 @@
-// frontend/src/App.tsx
-
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import { getAnalyticsSummary } from "./api/analytics";
@@ -238,569 +236,394 @@ export default function App() {
   }
 
   return (
-    <main style={styles.page}>
-      <header style={styles.header}>
-        <div>
-          <p style={styles.eyebrow}>Kwacha!</p>
-          <h1 style={styles.title}>Snap prices. Track change.</h1>
-          <p style={styles.subtitle}>
-            Local price tracking, personal basket inflation, and cost-of-living
-            visibility for Zambia.
-          </p>
-        </div>
+    <main className="min-h-screen bg-[#f8f4ea] px-4 py-6 text-[#1f1f1f] sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl">
+        <header className="mb-6 flex flex-col justify-between gap-5 md:flex-row md:items-start">
+          <div>
+            <p className="text-sm font-extrabold uppercase tracking-[0.14em] text-[#9a7a21]">
+              Kwacha!
+            </p>
+            <h1 className="mt-2 text-4xl font-black tracking-tight sm:text-5xl">
+              Snap prices. Track change.
+            </h1>
+            <p className="mt-3 max-w-3xl text-base leading-7 text-[#5f5b52]">
+              Local price tracking, personal basket inflation, and
+              cost-of-living visibility for Zambia.
+            </p>
+          </div>
 
-        <button
-          style={styles.secondaryButton}
-          onClick={() => void refreshData()}
-        >
-          Refresh
-        </button>
-      </header>
+          <button
+            className="w-fit rounded-xl border border-[#d8cdb7] bg-[#fffdf8] px-4 py-2.5 font-bold text-[#1f1f1f] shadow-sm transition hover:bg-white"
+            onClick={() => void refreshData()}
+          >
+            Refresh
+          </button>
+        </header>
 
-      {error ? <div style={styles.error}>{error}</div> : null}
+        {error ? (
+          <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">
+            {error}
+          </div>
+        ) : null}
 
-      {isLoading ? (
-        <section style={styles.card}>
-          <p>Loading dashboard...</p>
-        </section>
-      ) : (
-        <>
-          <section style={styles.statsGrid}>
-            <StatCard
-              label="Items"
-              value={summary?.item_count ?? items.length}
-            />
-            <StatCard
-              label="Price observations"
-              value={summary?.price_observation_count ?? prices.length}
-            />
-            <StatCard
-              label="Basket items"
-              value={summary?.basket_item_count ?? basketItems.length}
-            />
-            <StatCard
-              label="Basket total"
-              value={currencyFormatter.format(basketTotal?.total ?? 0)}
-            />
+        {isLoading ? (
+          <section className="rounded-3xl border border-[#e5dcc8] bg-[#fffdf8] p-5 shadow-[0_10px_30px_rgba(31,31,31,0.06)]">
+            <p className="text-[#5f5b52]">Loading dashboard...</p>
           </section>
+        ) : (
+          <>
+            <section className="mb-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <StatCard
+                label="Items"
+                value={summary?.item_count ?? items.length}
+              />
+              <StatCard
+                label="Price observations"
+                value={summary?.price_observation_count ?? prices.length}
+              />
+              <StatCard
+                label="Basket items"
+                value={summary?.basket_item_count ?? basketItems.length}
+              />
+              <StatCard
+                label="Basket total"
+                value={currencyFormatter.format(basketTotal?.total ?? 0)}
+              />
+            </section>
 
-          <section style={styles.grid}>
-            <form style={styles.card} onSubmit={handleCreateItem}>
-              <h2 style={styles.sectionTitle}>Add item</h2>
+            <section className="mb-4 grid gap-4 lg:grid-cols-3">
+              <form className="card" onSubmit={handleCreateItem}>
+                <h2 className="section-title">Add item</h2>
 
-              <label style={styles.label}>
-                Name
-                <input
-                  style={styles.input}
+                <TextInput
+                  label="Name"
                   value={itemForm.name}
-                  onChange={(event) =>
-                    setItemForm((current) => ({
-                      ...current,
-                      name: event.target.value,
-                    }))
+                  onChange={(value) =>
+                    setItemForm((current) => ({ ...current, name: value }))
                   }
                   placeholder="Mealie meal"
                 />
-              </label>
 
-              <label style={styles.label}>
-                Category
-                <input
-                  style={styles.input}
+                <TextInput
+                  label="Category"
                   value={itemForm.category}
-                  onChange={(event) =>
-                    setItemForm((current) => ({
-                      ...current,
-                      category: event.target.value,
-                    }))
+                  onChange={(value) =>
+                    setItemForm((current) => ({ ...current, category: value }))
                   }
                   placeholder="Food"
                 />
-              </label>
 
-              <label style={styles.label}>
-                Brand
-                <input
-                  style={styles.input}
+                <TextInput
+                  label="Brand"
                   value={itemForm.brand}
-                  onChange={(event) =>
-                    setItemForm((current) => ({
-                      ...current,
-                      brand: event.target.value,
-                    }))
+                  onChange={(value) =>
+                    setItemForm((current) => ({ ...current, brand: value }))
                   }
                   placeholder="Optional"
                 />
-              </label>
 
-              <label style={styles.label}>
-                Default unit
-                <input
-                  style={styles.input}
+                <TextInput
+                  label="Default unit"
                   value={itemForm.default_unit}
-                  onChange={(event) =>
+                  onChange={(value) =>
                     setItemForm((current) => ({
                       ...current,
-                      default_unit: event.target.value,
+                      default_unit: value,
                     }))
                   }
                   placeholder="kg"
                 />
-              </label>
 
-              <button style={styles.primaryButton} disabled={isSaving}>
-                Save item
-              </button>
-            </form>
+                <button className="primary-button" disabled={isSaving}>
+                  Save item
+                </button>
+              </form>
 
-            <form style={styles.card} onSubmit={handleCreatePrice}>
-              <h2 style={styles.sectionTitle}>Add price observation</h2>
+              <form className="card" onSubmit={handleCreatePrice}>
+                <h2 className="section-title">Add price observation</h2>
 
-              <label style={styles.label}>
-                Item
-                <select
-                  style={styles.input}
-                  value={priceForm.item_id}
-                  onChange={(event) =>
-                    setPriceForm((current) => ({
-                      ...current,
-                      item_id: event.target.value,
-                    }))
-                  }
-                >
-                  <option value="">Select item</option>
-                  {items.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                <label className="form-label">
+                  Item
+                  <select
+                    className="form-input"
+                    value={priceForm.item_id}
+                    onChange={(event) =>
+                      setPriceForm((current) => ({
+                        ...current,
+                        item_id: event.target.value,
+                      }))
+                    }
+                  >
+                    <option value="">Select item</option>
+                    {items.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
 
-              <label style={styles.label}>
-                Shop
-                <input
-                  style={styles.input}
+                <TextInput
+                  label="Shop"
                   value={priceForm.shop_name}
-                  onChange={(event) =>
+                  onChange={(value) =>
                     setPriceForm((current) => ({
                       ...current,
-                      shop_name: event.target.value,
+                      shop_name: value,
                     }))
                   }
                   placeholder="Shoprite"
                 />
-              </label>
 
-              <label style={styles.label}>
-                Location
-                <input
-                  style={styles.input}
+                <TextInput
+                  label="Location"
                   value={priceForm.location}
-                  onChange={(event) =>
-                    setPriceForm((current) => ({
-                      ...current,
-                      location: event.target.value,
-                    }))
+                  onChange={(value) =>
+                    setPriceForm((current) => ({ ...current, location: value }))
                   }
                   placeholder="Lusaka"
                 />
-              </label>
 
-              <div style={styles.twoColumn}>
-                <label style={styles.label}>
-                  Price
-                  <input
-                    style={styles.input}
+                <div className="grid grid-cols-2 gap-3">
+                  <TextInput
+                    label="Price"
                     type="number"
-                    min="0"
-                    step="0.01"
                     value={priceForm.price}
-                    onChange={(event) =>
-                      setPriceForm((current) => ({
-                        ...current,
-                        price: event.target.value,
-                      }))
+                    onChange={(value) =>
+                      setPriceForm((current) => ({ ...current, price: value }))
                     }
                     placeholder="250"
                   />
-                </label>
 
-                <label style={styles.label}>
-                  Quantity
-                  <input
-                    style={styles.input}
+                  <TextInput
+                    label="Quantity"
                     type="number"
-                    min="0"
-                    step="0.01"
                     value={priceForm.quantity}
-                    onChange={(event) =>
+                    onChange={(value) =>
                       setPriceForm((current) => ({
                         ...current,
-                        quantity: event.target.value,
+                        quantity: value,
                       }))
                     }
                   />
+                </div>
+
+                <TextInput
+                  label="Unit"
+                  value={priceForm.unit}
+                  onChange={(value) =>
+                    setPriceForm((current) => ({ ...current, unit: value }))
+                  }
+                  placeholder="kg"
+                />
+
+                <button className="primary-button" disabled={isSaving}>
+                  Save price
+                </button>
+              </form>
+
+              <form className="card" onSubmit={handleAddBasketItem}>
+                <h2 className="section-title">Add to basket</h2>
+
+                <label className="form-label">
+                  Item
+                  <select
+                    className="form-input"
+                    value={basketForm.item_id}
+                    onChange={(event) =>
+                      setBasketForm((current) => ({
+                        ...current,
+                        item_id: event.target.value,
+                      }))
+                    }
+                  >
+                    <option value="">Select item</option>
+                    {items.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.name}
+                      </option>
+                    ))}
+                  </select>
                 </label>
+
+                <TextInput
+                  label="Quantity"
+                  type="number"
+                  value={basketForm.quantity}
+                  onChange={(value) =>
+                    setBasketForm((current) => ({
+                      ...current,
+                      quantity: value,
+                    }))
+                  }
+                />
+
+                <TextInput
+                  label="Unit"
+                  value={basketForm.unit}
+                  onChange={(value) =>
+                    setBasketForm((current) => ({ ...current, unit: value }))
+                  }
+                  placeholder="kg"
+                />
+
+                <button className="primary-button" disabled={isSaving}>
+                  Add basket item
+                </button>
+              </form>
+            </section>
+
+            <section className="card">
+              <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                <h2 className="section-title mb-0">Basket total</h2>
+                <strong className="text-2xl font-black text-[#8a6d1d]">
+                  {currencyFormatter.format(basketTotal?.total ?? 0)}
+                </strong>
               </div>
 
-              <label style={styles.label}>
-                Unit
-                <input
-                  style={styles.input}
-                  value={priceForm.unit}
-                  onChange={(event) =>
-                    setPriceForm((current) => ({
-                      ...current,
-                      unit: event.target.value,
-                    }))
-                  }
-                  placeholder="kg"
-                />
-              </label>
-
-              <button style={styles.primaryButton} disabled={isSaving}>
-                Save price
-              </button>
-            </form>
-
-            <form style={styles.card} onSubmit={handleAddBasketItem}>
-              <h2 style={styles.sectionTitle}>Add to basket</h2>
-
-              <label style={styles.label}>
-                Item
-                <select
-                  style={styles.input}
-                  value={basketForm.item_id}
-                  onChange={(event) =>
-                    setBasketForm((current) => ({
-                      ...current,
-                      item_id: event.target.value,
-                    }))
-                  }
-                >
-                  <option value="">Select item</option>
-                  {items.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label style={styles.label}>
-                Quantity
-                <input
-                  style={styles.input}
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={basketForm.quantity}
-                  onChange={(event) =>
-                    setBasketForm((current) => ({
-                      ...current,
-                      quantity: event.target.value,
-                    }))
-                  }
-                />
-              </label>
-
-              <label style={styles.label}>
-                Unit
-                <input
-                  style={styles.input}
-                  value={basketForm.unit}
-                  onChange={(event) =>
-                    setBasketForm((current) => ({
-                      ...current,
-                      unit: event.target.value,
-                    }))
-                  }
-                  placeholder="kg"
-                />
-              </label>
-
-              <button style={styles.primaryButton} disabled={isSaving}>
-                Add basket item
-              </button>
-            </form>
-          </section>
-
-          <section style={styles.card}>
-            <div style={styles.sectionHeader}>
-              <h2 style={styles.sectionTitle}>Basket total</h2>
-              <strong style={styles.total}>
-                {currencyFormatter.format(basketTotal?.total ?? 0)}
-              </strong>
-            </div>
-
-            <div style={styles.tableWrap}>
-              <table style={styles.table}>
-                <thead>
-                  <tr>
-                    <th style={styles.th}>Item</th>
-                    <th style={styles.th}>Quantity</th>
-                    <th style={styles.th}>Latest price/unit</th>
-                    <th style={styles.th}>Shop</th>
-                    <th style={styles.th}>Line total</th>
-                    <th style={styles.th}>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {basketTotal?.items.length ? (
-                    basketTotal.items.map((line) => (
-                      <tr key={line.basket_item_id}>
-                        <td style={styles.td}>{line.item_name}</td>
-                        <td style={styles.td}>
-                          {line.quantity} {line.unit}
-                        </td>
-                        <td style={styles.td}>
-                          {line.price_per_unit === null
-                            ? "—"
-                            : currencyFormatter.format(line.price_per_unit)}
-                        </td>
-                        <td style={styles.td}>{line.shop_name ?? "—"}</td>
-                        <td style={styles.td}>
-                          {line.line_total === null
-                            ? "—"
-                            : currencyFormatter.format(line.line_total)}
-                        </td>
-                        <td style={styles.td}>{line.status}</td>
-                      </tr>
-                    ))
-                  ) : (
+              <div className="overflow-x-auto">
+                <table className="data-table">
+                  <thead>
                     <tr>
-                      <td style={styles.emptyCell} colSpan={6}>
-                        No basket items yet.
-                      </td>
+                      <TableHead>Item</TableHead>
+                      <TableHead>Quantity</TableHead>
+                      <TableHead>Latest price/unit</TableHead>
+                      <TableHead>Shop</TableHead>
+                      <TableHead>Line total</TableHead>
+                      <TableHead>Status</TableHead>
                     </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </section>
-
-          <section style={styles.card}>
-            <h2 style={styles.sectionTitle}>Recent price observations</h2>
-
-            <div style={styles.tableWrap}>
-              <table style={styles.table}>
-                <thead>
-                  <tr>
-                    <th style={styles.th}>Item</th>
-                    <th style={styles.th}>Shop</th>
-                    <th style={styles.th}>Location</th>
-                    <th style={styles.th}>Price</th>
-                    <th style={styles.th}>Price/unit</th>
-                    <th style={styles.th}>Observed</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {prices.length ? (
-                    prices.slice(0, 10).map((price) => (
-                      <tr key={price.id}>
-                        <td style={styles.td}>
-                          {itemNameById.get(price.item_id) ??
-                            `Item #${price.item_id}`}
-                        </td>
-                        <td style={styles.td}>{price.shop_name}</td>
-                        <td style={styles.td}>{price.location ?? "—"}</td>
-                        <td style={styles.td}>
-                          {currencyFormatter.format(price.price)} /{" "}
-                          {price.quantity} {price.unit}
-                        </td>
-                        <td style={styles.td}>
-                          {currencyFormatter.format(price.price_per_unit)}
-                        </td>
-                        <td style={styles.td}>
-                          {dateFormatter.format(new Date(price.observed_at))}
+                  </thead>
+                  <tbody>
+                    {basketTotal?.items.length ? (
+                      basketTotal.items.map((line) => (
+                        <tr key={line.basket_item_id}>
+                          <TableCell>{line.item_name}</TableCell>
+                          <TableCell>
+                            {line.quantity} {line.unit}
+                          </TableCell>
+                          <TableCell>
+                            {line.price_per_unit === null
+                              ? "—"
+                              : currencyFormatter.format(line.price_per_unit)}
+                          </TableCell>
+                          <TableCell>{line.shop_name ?? "—"}</TableCell>
+                          <TableCell>
+                            {line.line_total === null
+                              ? "—"
+                              : currencyFormatter.format(line.line_total)}
+                          </TableCell>
+                          <TableCell>{line.status}</TableCell>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td className="empty-cell" colSpan={6}>
+                          No basket items yet.
                         </td>
                       </tr>
-                    ))
-                  ) : (
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section className="card">
+              <h2 className="section-title">Recent price observations</h2>
+
+              <div className="overflow-x-auto">
+                <table className="data-table">
+                  <thead>
                     <tr>
-                      <td style={styles.emptyCell} colSpan={6}>
-                        No price observations yet.
-                      </td>
+                      <TableHead>Item</TableHead>
+                      <TableHead>Shop</TableHead>
+                      <TableHead>Location</TableHead>
+                      <TableHead>Price</TableHead>
+                      <TableHead>Price/unit</TableHead>
+                      <TableHead>Observed</TableHead>
                     </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        </>
-      )}
+                  </thead>
+                  <tbody>
+                    {prices.length ? (
+                      prices.slice(0, 10).map((price) => (
+                        <tr key={price.id}>
+                          <TableCell>
+                            {itemNameById.get(price.item_id) ??
+                              `Item #${price.item_id}`}
+                          </TableCell>
+                          <TableCell>{price.shop_name}</TableCell>
+                          <TableCell>{price.location ?? "—"}</TableCell>
+                          <TableCell>
+                            {currencyFormatter.format(price.price)} /{" "}
+                            {price.quantity} {price.unit}
+                          </TableCell>
+                          <TableCell>
+                            {currencyFormatter.format(price.price_per_unit)}
+                          </TableCell>
+                          <TableCell>
+                            {dateFormatter.format(new Date(price.observed_at))}
+                          </TableCell>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td className="empty-cell" colSpan={6}>
+                          No price observations yet.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </>
+        )}
+      </div>
     </main>
   );
 }
 
 function StatCard({ label, value }: { label: string; value: string | number }) {
   return (
-    <article style={styles.statCard}>
-      <p style={styles.statLabel}>{label}</p>
-      <strong style={styles.statValue}>{value}</strong>
+    <article className="rounded-3xl border border-[#e5dcc8] bg-[#fffdf8] p-5 shadow-[0_10px_30px_rgba(31,31,31,0.06)]">
+      <p className="mb-2 text-sm text-[#6b6254]">{label}</p>
+      <strong className="text-3xl font-black">{value}</strong>
     </article>
   );
 }
 
-const styles = {
-  page: {
-    minHeight: "100vh",
-    background: "#f8f4ea",
-    color: "#1f1f1f",
-    fontFamily:
-      'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-    padding: "32px",
-  },
-  header: {
-    display: "flex",
-    justifyContent: "space-between",
-    gap: "24px",
-    alignItems: "flex-start",
-    marginBottom: "24px",
-  },
-  eyebrow: {
-    margin: 0,
-    color: "#9a7a21",
-    fontWeight: 800,
-    textTransform: "uppercase",
-    letterSpacing: "0.08em",
-  },
-  title: {
-    margin: "6px 0",
-    fontSize: "40px",
-    lineHeight: 1.1,
-  },
-  subtitle: {
-    margin: 0,
-    maxWidth: "760px",
-    color: "#5f5b52",
-    fontSize: "16px",
-  },
-  statsGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-    gap: "16px",
-    marginBottom: "16px",
-  },
-  grid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-    gap: "16px",
-    marginBottom: "16px",
-  },
-  card: {
-    background: "#fffdf8",
-    border: "1px solid #e5dcc8",
-    borderRadius: "18px",
-    padding: "20px",
-    boxShadow: "0 10px 30px rgba(31, 31, 31, 0.06)",
-    marginBottom: "16px",
-  },
-  statCard: {
-    background: "#fffdf8",
-    border: "1px solid #e5dcc8",
-    borderRadius: "18px",
-    padding: "18px",
-    boxShadow: "0 10px 30px rgba(31, 31, 31, 0.06)",
-  },
-  statLabel: {
-    margin: "0 0 8px",
-    color: "#6b6254",
-    fontSize: "14px",
-  },
-  statValue: {
-    fontSize: "28px",
-  },
-  sectionHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    gap: "16px",
-    alignItems: "center",
-    marginBottom: "12px",
-  },
-  sectionTitle: {
-    margin: "0 0 14px",
-    fontSize: "20px",
-  },
-  total: {
-    fontSize: "24px",
-    color: "#8a6d1d",
-  },
-  label: {
-    display: "grid",
-    gap: "6px",
-    marginBottom: "12px",
-    color: "#4c463d",
-    fontSize: "14px",
-    fontWeight: 650,
-  },
-  input: {
-    width: "100%",
-    boxSizing: "border-box",
-    border: "1px solid #d8cdb7",
-    borderRadius: "12px",
-    padding: "11px 12px",
-    background: "#fff",
-    color: "#1f1f1f",
-    font: "inherit",
-  },
-  twoColumn: {
-    display: "grid",
-    gridTemplateColumns: "1fr 1fr",
-    gap: "12px",
-  },
-  primaryButton: {
-    width: "100%",
-    border: 0,
-    borderRadius: "12px",
-    padding: "12px 14px",
-    background: "#1f1f1f",
-    color: "#fff",
-    fontWeight: 800,
-    cursor: "pointer",
-  },
-  secondaryButton: {
-    border: "1px solid #d8cdb7",
-    borderRadius: "12px",
-    padding: "10px 14px",
-    background: "#fffdf8",
-    color: "#1f1f1f",
-    fontWeight: 750,
-    cursor: "pointer",
-  },
-  error: {
-    background: "#fff1f1",
-    border: "1px solid #f0b8b8",
-    color: "#8a1f1f",
-    borderRadius: "14px",
-    padding: "12px 14px",
-    marginBottom: "16px",
-  },
-  tableWrap: {
-    overflowX: "auto",
-  },
-  table: {
-    width: "100%",
-    borderCollapse: "collapse",
-    fontSize: "14px",
-  },
-  th: {
-    textAlign: "left",
-    borderBottom: "1px solid #e5dcc8",
-    padding: "10px 8px",
-    color: "#6b6254",
-    whiteSpace: "nowrap",
-  },
-  td: {
-    borderBottom: "1px solid #eee6d6",
-    padding: "12px 8px",
-    verticalAlign: "top",
-    whiteSpace: "nowrap",
-  },
-  emptyCell: {
-    padding: "18px 8px",
-    color: "#6b6254",
-    textAlign: "center",
-  },
-} satisfies Record<string, React.CSSProperties>;
+function TextInput({
+  label,
+  value,
+  onChange,
+  placeholder,
+  type = "text",
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  type?: "text" | "number";
+}) {
+  return (
+    <label className="form-label">
+      {label}
+      <input
+        className="form-input"
+        type={type}
+        min={type === "number" ? "0" : undefined}
+        step={type === "number" ? "0.01" : undefined}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+      />
+    </label>
+  );
+}
+
+function TableHead({ children }: { children: React.ReactNode }) {
+  return <th className="table-head">{children}</th>;
+}
+
+function TableCell({ children }: { children: React.ReactNode }) {
+  return <td className="table-cell">{children}</td>;
+}
