@@ -57,4 +57,8 @@ body {
   .empty-cell {
     @apply px-2 py-6 text-center text-[#6b6254];
   }
+
+  .danger-button {
+    @apply rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-extrabold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60;
+  }
 }

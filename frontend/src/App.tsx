@@ -1,9 +1,18 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import { getAnalyticsSummary } from "./api/analytics";
-import { addBasketItem, getBasketTotal, listBasketItems } from "./api/basket";
-import { createItem, listItems } from "./api/items";
-import { createPriceObservation, listPriceObservations } from "./api/prices";
+import {
+  addBasketItem,
+  getBasketTotal,
+  listBasketItems,
+  removeBasketItem,
+} from "./api/basket";
+import { createItem, deleteItem, listItems } from "./api/items";
+import {
+  createPriceObservation,
+  deletePriceObservation,
+  listPriceObservations,
+} from "./api/prices";
 import { downloadCsv, type ExportKind } from "./api/export";
 import type { AnalyticsSummary } from "./types/analytics";
 import type { BasketItem, BasketTotal } from "./types/basket";
@@ -247,6 +256,84 @@ export default function App() {
           ? currentError.message
           : "Failed to export CSV",
       );
+    }
+  }
+
+  async function handleDeleteItem(item: Item) {
+    const confirmed = window.confirm(
+      `Delete "${item.name}"? This may fail if the item has price observations or basket entries.`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      await deleteItem(item.id);
+      await refreshData();
+    } catch (currentError) {
+      setError(
+        currentError instanceof Error
+          ? currentError.message
+          : "Failed to delete item",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleDeletePriceObservation(price: PriceObservation) {
+    const itemName =
+      itemNameById.get(price.item_id) ?? `Item #${price.item_id}`;
+    const confirmed = window.confirm(
+      `Delete price observation for "${itemName}"?`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      await deletePriceObservation(price.id);
+      await refreshData();
+    } catch (currentError) {
+      setError(
+        currentError instanceof Error
+          ? currentError.message
+          : "Failed to delete price observation",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleRemoveBasketItem(basketItemId: number) {
+    const confirmed = window.confirm("Remove this item from the basket?");
+
+    if (!confirmed) {
+      return;
+    }
+
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      await removeBasketItem(basketItemId);
+      await refreshData();
+    } catch (currentError) {
+      setError(
+        currentError instanceof Error
+          ? currentError.message
+          : "Failed to remove basket item",
+      );
+    } finally {
+      setIsSaving(false);
     }
   }
 
@@ -512,6 +599,51 @@ export default function App() {
             </section>
 
             <section className="card">
+              <h2 className="section-title">Items</h2>
+
+              <div className="overflow-x-auto">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead>Brand</TableHead>
+                      <TableHead>Default unit</TableHead>
+                      <TableHead>Action</TableHead>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {items.length ? (
+                      items.map((item) => (
+                        <tr key={item.id}>
+                          <TableCell>{item.name}</TableCell>
+                          <TableCell>{item.category ?? "—"}</TableCell>
+                          <TableCell>{item.brand ?? "—"}</TableCell>
+                          <TableCell>{item.default_unit}</TableCell>
+                          <TableCell>
+                            <button
+                              className="danger-button"
+                              disabled={isSaving}
+                              onClick={() => void handleDeleteItem(item)}
+                            >
+                              Delete
+                            </button>
+                          </TableCell>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td className="empty-cell" colSpan={5}>
+                          No items yet.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section className="card">
               <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
                 <h2 className="section-title mb-0">Basket total</h2>
                 <strong className="text-2xl font-black text-[#8a6d1d]">
@@ -529,6 +661,7 @@ export default function App() {
                       <TableHead>Shop</TableHead>
                       <TableHead>Line total</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead>Action</TableHead>
                     </tr>
                   </thead>
                   <tbody>
@@ -551,11 +684,22 @@ export default function App() {
                               : currencyFormatter.format(line.line_total)}
                           </TableCell>
                           <TableCell>{line.status}</TableCell>
+                          <TableCell>
+                            <button
+                              className="danger-button"
+                              disabled={isSaving}
+                              onClick={() =>
+                                void handleRemoveBasketItem(line.basket_item_id)
+                              }
+                            >
+                              Remove
+                            </button>
+                          </TableCell>
                         </tr>
                       ))
                     ) : (
                       <tr>
-                        <td className="empty-cell" colSpan={6}>
+                        <td className="empty-cell" colSpan={7}>
                           No basket items yet.
                         </td>
                       </tr>
@@ -578,6 +722,7 @@ export default function App() {
                       <TableHead>Price</TableHead>
                       <TableHead>Price/unit</TableHead>
                       <TableHead>Observed</TableHead>
+                      <TableHead>Action</TableHead>
                     </tr>
                   </thead>
                   <tbody>
@@ -600,11 +745,22 @@ export default function App() {
                           <TableCell>
                             {dateFormatter.format(new Date(price.observed_at))}
                           </TableCell>
+                          <TableCell>
+                            <button
+                              className="danger-button"
+                              disabled={isSaving}
+                              onClick={() =>
+                                void handleDeletePriceObservation(price)
+                              }
+                            >
+                              Delete
+                            </button>
+                          </TableCell>
                         </tr>
                       ))
                     ) : (
                       <tr>
-                        <td className="empty-cell" colSpan={6}>
+                        <td className="empty-cell" colSpan={7}>
                           No price observations yet.
                         </td>
                       </tr>
