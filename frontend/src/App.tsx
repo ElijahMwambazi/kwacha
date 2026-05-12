@@ -6,12 +6,14 @@ import {
   getBasketTotal,
   listBasketItems,
   removeBasketItem,
+  updateBasketItem,
 } from "./api/basket";
-import { createItem, deleteItem, listItems } from "./api/items";
+import { createItem, deleteItem, listItems, updateItem } from "./api/items";
 import {
   createPriceObservation,
   deletePriceObservation,
   listPriceObservations,
+  updatePriceObservation,
 } from "./api/prices";
 import { downloadCsv, type ExportKind } from "./api/export";
 import type { AnalyticsSummary } from "./types/analytics";
@@ -337,6 +339,163 @@ export default function App() {
     }
   }
 
+  async function handleEditItem(item: Item) {
+    const name = window.prompt("Item name", item.name);
+
+    if (name === null) {
+      return;
+    }
+
+    const category = window.prompt("Category", item.category ?? "");
+
+    if (category === null) {
+      return;
+    }
+
+    const brand = window.prompt("Brand", item.brand ?? "");
+
+    if (brand === null) {
+      return;
+    }
+
+    const defaultUnit = window.prompt("Default unit", item.default_unit);
+
+    if (defaultUnit === null) {
+      return;
+    }
+
+    if (!name.trim() || !defaultUnit.trim()) {
+      setError("Item name and default unit are required");
+      return;
+    }
+
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      await updateItem(item.id, {
+        name: name.trim(),
+        category: category.trim() || null,
+        brand: brand.trim() || null,
+        default_unit: defaultUnit.trim(),
+      });
+
+      await refreshData();
+    } catch (currentError) {
+      setError(
+        currentError instanceof Error
+          ? currentError.message
+          : "Failed to update item",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleEditPriceObservation(price: PriceObservation) {
+    const shopName = window.prompt("Shop name", price.shop_name);
+
+    if (shopName === null) {
+      return;
+    }
+
+    const location = window.prompt("Location", price.location ?? "");
+
+    if (location === null) {
+      return;
+    }
+
+    const priceValue = window.prompt("Price", String(price.price));
+
+    if (priceValue === null) {
+      return;
+    }
+
+    const quantity = window.prompt("Quantity", String(price.quantity));
+
+    if (quantity === null) {
+      return;
+    }
+
+    const unit = window.prompt("Unit", price.unit);
+
+    if (unit === null) {
+      return;
+    }
+
+    const parsedPrice = Number(priceValue);
+    const parsedQuantity = Number(quantity);
+
+    if (!shopName.trim() || !parsedPrice || !parsedQuantity || !unit.trim()) {
+      setError("Shop, price, quantity, and unit are required");
+      return;
+    }
+
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      await updatePriceObservation(price.id, {
+        shop_name: shopName.trim(),
+        location: location.trim() || null,
+        price: parsedPrice,
+        quantity: parsedQuantity,
+        unit: unit.trim(),
+      });
+
+      await refreshData();
+    } catch (currentError) {
+      setError(
+        currentError instanceof Error
+          ? currentError.message
+          : "Failed to update price observation",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleEditBasketLine(line: BasketTotal["items"][number]) {
+    const quantity = window.prompt("Basket quantity", String(line.quantity));
+
+    if (quantity === null) {
+      return;
+    }
+
+    const unit = window.prompt("Basket unit", line.unit);
+
+    if (unit === null) {
+      return;
+    }
+
+    const parsedQuantity = Number(quantity);
+
+    if (!parsedQuantity || !unit.trim()) {
+      setError("Basket quantity and unit are required");
+      return;
+    }
+
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      await updateBasketItem(line.basket_item_id, {
+        quantity: parsedQuantity,
+        unit: unit.trim(),
+      });
+
+      await refreshData();
+    } catch (currentError) {
+      setError(
+        currentError instanceof Error
+          ? currentError.message
+          : "Failed to update basket item",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   return (
     <main className="min-h-screen bg-[#f8f4ea] px-4 py-6 text-[#1f1f1f] sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl">
@@ -621,13 +780,23 @@ export default function App() {
                           <TableCell>{item.brand ?? "—"}</TableCell>
                           <TableCell>{item.default_unit}</TableCell>
                           <TableCell>
-                            <button
-                              className="danger-button"
-                              disabled={isSaving}
-                              onClick={() => void handleDeleteItem(item)}
-                            >
-                              Delete
-                            </button>
+                            <div className="flex gap-2">
+                              <button
+                                className="secondary-small-button"
+                                disabled={isSaving}
+                                onClick={() => void handleEditItem(item)}
+                              >
+                                Edit
+                              </button>
+
+                              <button
+                                className="danger-button"
+                                disabled={isSaving}
+                                onClick={() => void handleDeleteItem(item)}
+                              >
+                                Delete
+                              </button>
+                            </div>
                           </TableCell>
                         </tr>
                       ))
@@ -685,15 +854,27 @@ export default function App() {
                           </TableCell>
                           <TableCell>{line.status}</TableCell>
                           <TableCell>
-                            <button
-                              className="danger-button"
-                              disabled={isSaving}
-                              onClick={() =>
-                                void handleRemoveBasketItem(line.basket_item_id)
-                              }
-                            >
-                              Remove
-                            </button>
+                            <div className="flex gap-2">
+                              <button
+                                className="secondary-small-button"
+                                disabled={isSaving}
+                                onClick={() => void handleEditBasketLine(line)}
+                              >
+                                Edit
+                              </button>
+
+                              <button
+                                className="danger-button"
+                                disabled={isSaving}
+                                onClick={() =>
+                                  void handleRemoveBasketItem(
+                                    line.basket_item_id,
+                                  )
+                                }
+                              >
+                                Remove
+                              </button>
+                            </div>
                           </TableCell>
                         </tr>
                       ))
@@ -746,15 +927,27 @@ export default function App() {
                             {dateFormatter.format(new Date(price.observed_at))}
                           </TableCell>
                           <TableCell>
-                            <button
-                              className="danger-button"
-                              disabled={isSaving}
-                              onClick={() =>
-                                void handleDeletePriceObservation(price)
-                              }
-                            >
-                              Delete
-                            </button>
+                            <div className="flex gap-2">
+                              <button
+                                className="secondary-small-button"
+                                disabled={isSaving}
+                                onClick={() =>
+                                  void handleEditPriceObservation(price)
+                                }
+                              >
+                                Edit
+                              </button>
+
+                              <button
+                                className="danger-button"
+                                disabled={isSaving}
+                                onClick={() =>
+                                  void handleDeletePriceObservation(price)
+                                }
+                              >
+                                Delete
+                              </button>
+                            </div>
                           </TableCell>
                         </tr>
                       ))

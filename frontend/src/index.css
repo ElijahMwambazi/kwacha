@@ -61,4 +61,8 @@ body {
   .danger-button {
     @apply rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-extrabold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60;
   }
+
+  .secondary-small-button {
+    @apply rounded-lg border border-[#d8cdb7] bg-[#fffdf8] px-3 py-1.5 text-xs font-extrabold text-[#1f1f1f] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60;
+  }
 }
