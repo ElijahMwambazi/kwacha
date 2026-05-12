@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 
 from app.database import create_db_and_tables
-from app.routes import health, items, prices, basket, analytics, imports, indicators, predictions
+from app.routes import analytics, basket, health, imports, indicators, items, predictions, prices
 
 app = FastAPI(title="Kwacha API", version="0.1.0")
 
