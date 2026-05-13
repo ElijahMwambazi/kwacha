@@ -39,6 +39,10 @@ import {
   deleteIndicator,
   listIndicators,
 } from "./api/indicators";
+import {
+  predictNextBasketTotal,
+  predictNextItemPrice,
+} from "./api/predictions";
 import type {
   AnalyticsSummary,
   BasketInflationPoint,
@@ -50,6 +54,10 @@ import type { BasketItem, BasketTotal } from "./types/basket";
 import type { Item } from "./types/item";
 import type { PriceObservation } from "./types/price";
 import type { PublicIndicator } from "./types/indicators";
+import type {
+  BasketTotalPrediction,
+  ItemPricePrediction,
+} from "./types/prediction";
 
 type ItemFormState = {
   name: string;
@@ -154,6 +162,14 @@ export default function App() {
   const [indicatorForm, setIndicatorForm] =
     useState<IndicatorFormState>(initialIndicatorForm);
 
+  const [selectedPredictionItemId, setSelectedPredictionItemId] =
+    useState<string>("");
+  const [itemPrediction, setItemPrediction] =
+    useState<ItemPricePrediction | null>(null);
+  const [basketPrediction, setBasketPrediction] =
+    useState<BasketTotalPrediction | null>(null);
+  const [predictionWindow, setPredictionWindow] = useState<string>("3");
+
   const itemNameById = useMemo(() => {
     return new Map(items.map((item) => [item.id, item.name]));
   }, [items]);
@@ -201,6 +217,7 @@ export default function App() {
       nextBasketInflation,
       nextIndicators,
       nextIndicatorTrends,
+      nextBasketPrediction,
     ] = await Promise.all([
       listItems(),
       listPriceObservations(),
@@ -212,6 +229,7 @@ export default function App() {
       getBasketInflation(),
       listIndicators(),
       getIndicatorTrends(indicatorName),
+      predictNextBasketTotal(Number(predictionWindow) || 3).catch(() => null),
     ]);
 
     setItems(nextItems);
@@ -224,6 +242,7 @@ export default function App() {
     setBasketInflation(nextBasketInflation);
     setIndicators(nextIndicators);
     setIndicatorTrends(nextIndicatorTrends);
+    setBasketPrediction(nextBasketPrediction);
   }
 
   useEffect(() => {
@@ -742,6 +761,62 @@ export default function App() {
     }
   }
 
+  async function handlePredictItemPrice(
+    itemIdValue = selectedPredictionItemId,
+  ) {
+    const itemId = Number(itemIdValue);
+    const windowSize = Number(predictionWindow) || 3;
+
+    if (!itemId) {
+      setItemPrediction(null);
+      return;
+    }
+
+    setError(null);
+
+    try {
+      const prediction = await predictNextItemPrice(itemId, windowSize);
+      setItemPrediction(prediction);
+    } catch (currentError) {
+      setItemPrediction(null);
+      setError(
+        currentError instanceof Error
+          ? currentError.message
+          : "Failed to predict item price",
+      );
+    }
+  }
+
+  async function handlePredictionItemChange(itemId: string) {
+    setSelectedPredictionItemId(itemId);
+    await handlePredictItemPrice(itemId);
+  }
+
+  async function handlePredictionWindowChange(windowValue: string) {
+    setPredictionWindow(windowValue);
+
+    try {
+      const nextBasketPrediction = await predictNextBasketTotal(
+        Number(windowValue) || 3,
+      );
+      setBasketPrediction(nextBasketPrediction);
+
+      if (selectedPredictionItemId) {
+        const nextItemPrediction = await predictNextItemPrice(
+          Number(selectedPredictionItemId),
+          Number(windowValue) || 3,
+        );
+        setItemPrediction(nextItemPrediction);
+      }
+    } catch (currentError) {
+      setError(
+        currentError instanceof Error
+          ? currentError.message
+          : "Failed to refresh predictions",
+      );
+    }
+  }
+
   return (
     <main className="min-h-screen bg-[#f8f4ea] px-4 py-6 text-[#1f1f1f] sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl">
@@ -1065,6 +1140,148 @@ export default function App() {
                           <tr>
                             <td className="empty-cell" colSpan={4}>
                               No basket inflation data yet.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section className="card">
+              <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                <div>
+                  <h2 className="section-title mb-1">Forecast baseline</h2>
+                  <p className="text-sm text-[#6b6254]">
+                    Simple moving-average predictions before training full ML
+                    models.
+                  </p>
+                </div>
+
+                <label className="w-40 text-sm font-bold text-[#4c463d]">
+                  Window
+                  <input
+                    className="form-input mt-1"
+                    type="number"
+                    min="1"
+                    max="30"
+                    value={predictionWindow}
+                    onChange={(event) =>
+                      void handlePredictionWindowChange(event.target.value)
+                    }
+                  />
+                </label>
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-[0.8fr_1.2fr]">
+                <div className="rounded-2xl border border-[#eee6d6] bg-white p-4">
+                  <h3 className="mb-3 text-sm font-black uppercase tracking-wide text-[#6b6254]">
+                    Item next price
+                  </h3>
+
+                  <label className="form-label">
+                    Item
+                    <select
+                      className="form-input"
+                      value={selectedPredictionItemId}
+                      onChange={(event) =>
+                        void handlePredictionItemChange(event.target.value)
+                      }
+                    >
+                      <option value="">Select item</option>
+                      {items.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  {itemPrediction ? (
+                    <div className="rounded-2xl bg-[#f8f4ea] p-4">
+                      <p className="text-sm text-[#6b6254]">
+                        {itemPrediction.item_name}
+                      </p>
+                      <p className="mt-1 text-3xl font-black text-[#1f1f1f]">
+                        {currencyFormatter.format(
+                          itemPrediction.predicted_price_per_unit,
+                        )}
+                      </p>
+                      <p className="mt-2 text-sm text-[#6b6254]">
+                        Per {itemPrediction.unit} ·{" "}
+                        {itemPrediction.observations_used} observations ·{" "}
+                        {itemPrediction.confidence} confidence
+                      </p>
+                      <p className="mt-2 text-sm text-[#6b6254]">
+                        Latest:{" "}
+                        {currencyFormatter.format(
+                          itemPrediction.latest_price_per_unit,
+                        )}
+                        {itemPrediction.latest_change_percent === null
+                          ? ""
+                          : ` (${itemPrediction.latest_change_percent}%)`}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl bg-[#f8f4ea] p-4 text-sm text-[#6b6254]">
+                      Select an item with price history.
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-2xl border border-[#eee6d6] bg-white p-4">
+                  <div className="mb-3 flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
+                    <h3 className="text-sm font-black uppercase tracking-wide text-[#6b6254]">
+                      Predicted basket total
+                    </h3>
+
+                    <strong className="text-2xl font-black text-[#8a6d1d]">
+                      {currencyFormatter.format(
+                        basketPrediction?.predicted_total ?? 0,
+                      )}
+                    </strong>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <TableHead>Item</TableHead>
+                          <TableHead>Predicted/unit</TableHead>
+                          <TableHead>Line total</TableHead>
+                          <TableHead>Data</TableHead>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {basketPrediction?.items.length ? (
+                          basketPrediction.items.map((line) => (
+                            <tr key={line.basket_item_id}>
+                              <TableCell>{line.item_name}</TableCell>
+                              <TableCell>
+                                {line.predicted_price_per_unit === null
+                                  ? "—"
+                                  : currencyFormatter.format(
+                                      line.predicted_price_per_unit,
+                                    )}
+                              </TableCell>
+                              <TableCell>
+                                {line.predicted_line_total === null
+                                  ? "—"
+                                  : currencyFormatter.format(
+                                      line.predicted_line_total,
+                                    )}
+                              </TableCell>
+                              <TableCell>
+                                {line.observations_used} observations
+                              </TableCell>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td className="empty-cell" colSpan={4}>
+                              No basket prediction available yet.
                             </td>
                           </tr>
                         )}
