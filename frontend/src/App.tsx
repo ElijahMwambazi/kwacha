@@ -1,6 +1,18 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import {
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
-import { getAnalyticsSummary } from "./api/analytics";
+import {
+  getAnalyticsSummary,
+  getPriceTrends,
+  getShopComparison,
+} from "./api/analytics";
 import {
   addBasketItem,
   getBasketTotal,
@@ -16,7 +28,11 @@ import {
   updatePriceObservation,
 } from "./api/prices";
 import { downloadCsv, type ExportKind } from "./api/export";
-import type { AnalyticsSummary } from "./types/analytics";
+import type {
+  AnalyticsSummary,
+  PriceTrendPoint,
+  ShopComparison,
+} from "./types/analytics";
 import type { BasketItem, BasketTotal } from "./types/basket";
 import type { Item } from "./types/item";
 import type { PriceObservation } from "./types/price";
@@ -91,12 +107,28 @@ export default function App() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [priceTrends, setPriceTrends] = useState<PriceTrendPoint[]>([]);
+  const [shopComparison, setShopComparison] = useState<ShopComparison[]>([]);
+  const [selectedAnalyticsItemId, setSelectedAnalyticsItemId] =
+    useState<string>("");
+
   const itemNameById = useMemo(() => {
     return new Map(items.map((item) => [item.id, item.name]));
   }, [items]);
 
-  async function refreshData() {
+  const chartData = useMemo(() => {
+    return priceTrends.map((point) => ({
+      ...point,
+      observed_label: dateFormatter.format(new Date(point.observed_at)),
+    }));
+  }, [priceTrends]);
+
+  async function refreshData(itemIdForAnalytics = selectedAnalyticsItemId) {
     setError(null);
+
+    const analyticsItemId = itemIdForAnalytics
+      ? Number(itemIdForAnalytics)
+      : undefined;
 
     const [
       nextItems,
@@ -104,12 +136,16 @@ export default function App() {
       nextBasketItems,
       nextBasketTotal,
       nextSummary,
+      nextPriceTrends,
+      nextShopComparison,
     ] = await Promise.all([
       listItems(),
       listPriceObservations(),
       listBasketItems(),
       getBasketTotal(),
       getAnalyticsSummary(),
+      getPriceTrends(analyticsItemId),
+      getShopComparison(analyticsItemId),
     ]);
 
     setItems(nextItems);
@@ -117,6 +153,8 @@ export default function App() {
     setBasketItems(nextBasketItems);
     setBasketTotal(nextBasketTotal);
     setSummary(nextSummary);
+    setPriceTrends(nextPriceTrends);
+    setShopComparison(nextShopComparison);
   }
 
   useEffect(() => {
@@ -496,6 +534,20 @@ export default function App() {
     }
   }
 
+  async function handleAnalyticsItemChange(itemId: string) {
+    setSelectedAnalyticsItemId(itemId);
+
+    try {
+      await refreshData(itemId);
+    } catch (currentError) {
+      setError(
+        currentError instanceof Error
+          ? currentError.message
+          : "Failed to refresh analytics",
+      );
+    }
+  }
+
   return (
     <main className="min-h-screen bg-[#f8f4ea] px-4 py-6 text-[#1f1f1f] sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl">
@@ -573,6 +625,121 @@ export default function App() {
                 label="Basket total"
                 value={currencyFormatter.format(basketTotal?.total ?? 0)}
               />
+            </section>
+
+            <section className="card">
+              <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                <div>
+                  <h2 className="section-title mb-1">Price analytics</h2>
+                  <p className="text-sm text-[#6b6254]">
+                    Track price-per-unit changes and compare shops.
+                  </p>
+                </div>
+
+                <label className="min-w-64 text-sm font-bold text-[#4c463d]">
+                  Filter item
+                  <select
+                    className="form-input mt-1"
+                    value={selectedAnalyticsItemId}
+                    onChange={(event) =>
+                      void handleAnalyticsItemChange(event.target.value)
+                    }
+                  >
+                    <option value="">All items</option>
+                    {items.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+                <div className="rounded-2xl border border-[#eee6d6] bg-white p-4">
+                  <h3 className="mb-3 text-sm font-black uppercase tracking-wide text-[#6b6254]">
+                    Price trend
+                  </h3>
+
+                  {chartData.length ? (
+                    <div className="h-72">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={chartData}>
+                          <XAxis
+                            dataKey="observed_label"
+                            tick={{ fontSize: 12 }}
+                            interval="preserveStartEnd"
+                          />
+                          <YAxis tick={{ fontSize: 12 }} />
+                          <Tooltip
+                            formatter={(value) =>
+                              typeof value === "number"
+                                ? currencyFormatter.format(value)
+                                : value
+                            }
+                            labelFormatter={(label) => `Observed: ${label}`}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="price_per_unit"
+                            name="Price per unit"
+                            strokeWidth={3}
+                            dot
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : (
+                    <div className="flex h-72 items-center justify-center rounded-xl bg-[#f8f4ea] text-sm text-[#6b6254]">
+                      No price trend data yet.
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-2xl border border-[#eee6d6] bg-white p-4">
+                  <h3 className="mb-3 text-sm font-black uppercase tracking-wide text-[#6b6254]">
+                    Best average shop prices
+                  </h3>
+
+                  <div className="overflow-x-auto">
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <TableHead>Item</TableHead>
+                          <TableHead>Shop</TableHead>
+                          <TableHead>Avg/unit</TableHead>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {shopComparison.length ? (
+                          shopComparison.slice(0, 8).map((shop) => (
+                            <tr
+                              key={`${shop.item_id}-${shop.shop_name}-${shop.location ?? ""}`}
+                            >
+                              <TableCell>{shop.item_name}</TableCell>
+                              <TableCell>
+                                {shop.shop_name}
+                                {shop.location ? `, ${shop.location}` : ""}
+                              </TableCell>
+                              <TableCell>
+                                {currencyFormatter.format(
+                                  shop.avg_price_per_unit,
+                                )}
+                              </TableCell>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td className="empty-cell" colSpan={3}>
+                              No shop comparison data yet.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
             </section>
 
             <section className="mb-4 grid gap-4 lg:grid-cols-3">

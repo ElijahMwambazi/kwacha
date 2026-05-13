@@ -13,6 +13,7 @@
     "@vitejs/plugin-react": "",
     "react": "",
     "react-dom": "",
+    "react-is": "^19.2.6",
     "recharts": "",
     "typescript": "",
     "vite": ""
