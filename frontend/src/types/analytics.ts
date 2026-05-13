@@ -38,3 +38,12 @@ export type BasketInflationPoint = {
   priced_items_count: number;
   missing_items_count: number;
 };
+
+export type IndicatorTrendPoint = {
+  indicator_id: number;
+  name: string;
+  value: number;
+  unit: string | null;
+  source: string | null;
+  observed_at: string;
+};

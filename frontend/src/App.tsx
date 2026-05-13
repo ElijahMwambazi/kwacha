@@ -13,6 +13,7 @@ import {
   getBasketInflation,
   getPriceTrends,
   getShopComparison,
+  getIndicatorTrends,
 } from "./api/analytics";
 import {
   addBasketItem,
@@ -41,6 +42,7 @@ import {
 import type {
   AnalyticsSummary,
   BasketInflationPoint,
+  IndicatorTrendPoint,
   PriceTrendPoint,
   ShopComparison,
 } from "./types/analytics";
@@ -142,6 +144,11 @@ export default function App() {
   const [basketInflation, setBasketInflation] = useState<
     BasketInflationPoint[]
   >([]);
+  const [indicatorTrends, setIndicatorTrends] = useState<IndicatorTrendPoint[]>(
+    [],
+  );
+  const [selectedIndicatorName, setSelectedIndicatorName] =
+    useState<string>("");
 
   const [indicators, setIndicators] = useState<PublicIndicator[]>([]);
   const [indicatorForm, setIndicatorForm] =
@@ -150,14 +157,12 @@ export default function App() {
   const itemNameById = useMemo(() => {
     return new Map(items.map((item) => [item.id, item.name]));
   }, [items]);
-
   const chartData = useMemo(() => {
     return priceTrends.map((point) => ({
       ...point,
       observed_label: dateFormatter.format(new Date(point.observed_at)),
     }));
   }, [priceTrends]);
-
   const basketInflationChartData = useMemo(() => {
     return basketInflation.map((point) => ({
       ...point,
@@ -167,13 +172,23 @@ export default function App() {
           : `${point.monthly_change_percent}%`,
     }));
   }, [basketInflation]);
+  const indicatorTrendChartData = useMemo(() => {
+    return indicatorTrends.map((point) => ({
+      ...point,
+      observed_label: dateFormatter.format(new Date(point.observed_at)),
+    }));
+  }, [indicatorTrends]);
 
-  async function refreshData(itemIdForAnalytics = selectedAnalyticsItemId) {
+  async function refreshData(
+    itemIdForAnalytics = selectedAnalyticsItemId,
+    indicatorNameForAnalytics = selectedIndicatorName,
+  ) {
     setError(null);
 
     const analyticsItemId = itemIdForAnalytics
       ? Number(itemIdForAnalytics)
       : undefined;
+    const indicatorName = indicatorNameForAnalytics.trim() || undefined;
 
     const [
       nextItems,
@@ -185,6 +200,7 @@ export default function App() {
       nextShopComparison,
       nextBasketInflation,
       nextIndicators,
+      nextIndicatorTrends,
     ] = await Promise.all([
       listItems(),
       listPriceObservations(),
@@ -195,6 +211,7 @@ export default function App() {
       getShopComparison(analyticsItemId),
       getBasketInflation(),
       listIndicators(),
+      getIndicatorTrends(indicatorName),
     ]);
 
     setItems(nextItems);
@@ -206,6 +223,7 @@ export default function App() {
     setShopComparison(nextShopComparison);
     setBasketInflation(nextBasketInflation);
     setIndicators(nextIndicators);
+    setIndicatorTrends(nextIndicatorTrends);
   }
 
   useEffect(() => {
@@ -645,6 +663,20 @@ export default function App() {
     }
   }
 
+  async function handleIndicatorTrendChange(name: string) {
+    setSelectedIndicatorName(name);
+
+    try {
+      await refreshData(selectedAnalyticsItemId, name);
+    } catch (currentError) {
+      setError(
+        currentError instanceof Error
+          ? currentError.message
+          : "Failed to refresh indicator trends",
+      );
+    }
+  }
+
   async function handleCreateIndicator(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -1026,6 +1058,131 @@ export default function App() {
                           <tr>
                             <td className="empty-cell" colSpan={4}>
                               No basket inflation data yet.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section className="card">
+              <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                <div>
+                  <h2 className="section-title mb-1">Indicator trends</h2>
+                  <p className="text-sm text-[#6b6254]">
+                    Track external signals over time for later forecasting
+                    features.
+                  </p>
+                </div>
+
+                <label className="min-w-64 text-sm font-bold text-[#4c463d]">
+                  Filter indicator
+                  <select
+                    className="form-input mt-1"
+                    value={selectedIndicatorName}
+                    onChange={(event) =>
+                      void handleIndicatorTrendChange(event.target.value)
+                    }
+                  >
+                    <option value="">All indicators</option>
+                    <option value="exchange_rate_usd_zmw">
+                      USD/ZMW exchange rate
+                    </option>
+                    <option value="fuel_price_petrol">
+                      Fuel price - petrol
+                    </option>
+                    <option value="fuel_price_diesel">
+                      Fuel price - diesel
+                    </option>
+                    <option value="official_inflation">
+                      Official inflation
+                    </option>
+                  </select>
+                </label>
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+                <div className="rounded-2xl border border-[#eee6d6] bg-white p-4">
+                  <h3 className="mb-3 text-sm font-black uppercase tracking-wide text-[#6b6254]">
+                    Indicator value trend
+                  </h3>
+
+                  {indicatorTrendChartData.length ? (
+                    <div className="h-72">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={indicatorTrendChartData}>
+                          <XAxis
+                            dataKey="observed_label"
+                            tick={{ fontSize: 12 }}
+                            interval="preserveStartEnd"
+                          />
+                          <YAxis tick={{ fontSize: 12 }} />
+                          <Tooltip
+                            formatter={(value, name) => {
+                              if (name === "value") {
+                                return [value, "Value"];
+                              }
+
+                              return [value, name];
+                            }}
+                            labelFormatter={(label) => `Observed: ${label}`}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="value"
+                            name="Value"
+                            strokeWidth={3}
+                            dot
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : (
+                    <div className="flex h-72 items-center justify-center rounded-xl bg-[#f8f4ea] text-sm text-[#6b6254]">
+                      No indicator trend data yet.
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-2xl border border-[#eee6d6] bg-white p-4">
+                  <h3 className="mb-3 text-sm font-black uppercase tracking-wide text-[#6b6254]">
+                    Recent indicator readings
+                  </h3>
+
+                  <div className="overflow-x-auto">
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Value</TableHead>
+                          <TableHead>Observed</TableHead>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {indicatorTrends.length ? (
+                          indicatorTrends
+                            .slice(-8)
+                            .reverse()
+                            .map((point) => (
+                              <tr key={point.indicator_id}>
+                                <TableCell>{point.name}</TableCell>
+                                <TableCell>
+                                  {point.value} {point.unit ?? ""}
+                                </TableCell>
+                                <TableCell>
+                                  {dateFormatter.format(
+                                    new Date(point.observed_at),
+                                  )}
+                                </TableCell>
+                              </tr>
+                            ))
+                        ) : (
+                          <tr>
+                            <td className="empty-cell" colSpan={3}>
+                              No indicator trend data yet.
                             </td>
                           </tr>
                         )}

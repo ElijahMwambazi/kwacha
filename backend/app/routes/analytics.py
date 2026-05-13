@@ -9,6 +9,7 @@ from app.database import get_session
 from app.models.basket import BasketItem
 from app.models.item import Item
 from app.models.price_observation import PriceObservation
+from app.models.public_indicator import PublicIndicator
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
@@ -195,3 +196,30 @@ def get_basket_inflation(
         previous_total = total
 
     return result
+
+@router.get("/indicator-trends")
+def get_indicator_trends(
+    name: str | None = Query(default=None),
+    session: Session = Depends(get_session),
+) -> list[dict[str, Any]]:
+    statement = select(PublicIndicator).order_by(
+        PublicIndicator.observed_at.asc(),
+        PublicIndicator.id.asc(),
+    )
+
+    if name:
+        statement = statement.where(PublicIndicator.name == name)
+
+    indicators = session.exec(statement).all()
+
+    return [
+        {
+            "indicator_id": indicator.id,
+            "name": indicator.name,
+            "value": indicator.value,
+            "unit": indicator.unit,
+            "source": indicator.source,
+            "observed_at": indicator.observed_at,
+        }
+        for indicator in indicators
+    ]
