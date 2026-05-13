@@ -29,6 +29,7 @@ import {
   updatePriceObservation,
 } from "./api/prices";
 import { downloadCsv, type ExportKind } from "./api/export";
+import { importPriceObservationsCsv } from "./api/imports";
 import type {
   AnalyticsSummary,
   BasketInflationPoint,
@@ -566,6 +567,38 @@ export default function App() {
     }
   }
 
+  async function handleImportPricesCsv(
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) {
+    const file = event.target.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      const result = await importPriceObservationsCsv(file);
+
+      await refreshData();
+
+      window.alert(
+        `Imported ${result.imported_count} price observations. Created ${result.created_item_count} new items.`,
+      );
+    } catch (currentError) {
+      setError(
+        currentError instanceof Error
+          ? currentError.message
+          : "Failed to import price CSV",
+      );
+    } finally {
+      event.target.value = "";
+      setIsSaving(false);
+    }
+  }
+
   return (
     <main className="min-h-screen bg-[#f8f4ea] px-4 py-6 text-[#1f1f1f] sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl">
@@ -611,6 +644,17 @@ export default function App() {
             >
               Export basket
             </button>
+
+            <label className="w-fit cursor-pointer rounded-xl border border-[#d8cdb7] bg-[#fffdf8] px-4 py-2.5 font-bold text-[#1f1f1f] shadow-sm transition hover:bg-white">
+              Import prices
+              <input
+                className="hidden"
+                type="file"
+                accept=".csv,text/csv"
+                disabled={isSaving}
+                onChange={(event) => void handleImportPricesCsv(event)}
+              />
+            </label>
           </div>
         </header>
 
