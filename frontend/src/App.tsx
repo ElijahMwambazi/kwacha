@@ -42,6 +42,8 @@ import {
 import {
   predictNextBasketTotal,
   predictNextItemPrice,
+  predictNextItemPriceWithMl,
+  trainPriceModel,
 } from "./api/predictions";
 import type {
   AnalyticsSummary,
@@ -57,6 +59,8 @@ import type { PublicIndicator } from "./types/indicators";
 import type {
   BasketTotalPrediction,
   ItemPricePrediction,
+  MLItemPricePrediction,
+  PriceModelTrainingResult,
 } from "./types/prediction";
 
 type ItemFormState = {
@@ -169,6 +173,11 @@ export default function App() {
   const [basketPrediction, setBasketPrediction] =
     useState<BasketTotalPrediction | null>(null);
   const [predictionWindow, setPredictionWindow] = useState<string>("3");
+
+  const [mlItemPrediction, setMlItemPrediction] =
+    useState<MLItemPricePrediction | null>(null);
+  const [modelTrainingResult, setModelTrainingResult] =
+    useState<PriceModelTrainingResult | null>(null);
 
   const itemNameById = useMemo(() => {
     return new Map(items.map((item) => [item.id, item.name]));
@@ -790,6 +799,7 @@ export default function App() {
   async function handlePredictionItemChange(itemId: string) {
     setSelectedPredictionItemId(itemId);
     await handlePredictItemPrice(itemId);
+    await handlePredictItemPriceWithMl(itemId);
   }
 
   async function handlePredictionWindowChange(windowValue: string) {
@@ -813,6 +823,56 @@ export default function App() {
         currentError instanceof Error
           ? currentError.message
           : "Failed to refresh predictions",
+      );
+    }
+  }
+
+  async function handleTrainPriceModel() {
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      const result = await trainPriceModel();
+      setModelTrainingResult(result);
+
+      if (selectedPredictionItemId) {
+        const prediction = await predictNextItemPriceWithMl(
+          Number(selectedPredictionItemId),
+        );
+        setMlItemPrediction(prediction);
+      }
+    } catch (currentError) {
+      setError(
+        currentError instanceof Error
+          ? currentError.message
+          : "Failed to train price model",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handlePredictItemPriceWithMl(
+    itemIdValue = selectedPredictionItemId,
+  ) {
+    const itemId = Number(itemIdValue);
+
+    if (!itemId) {
+      setMlItemPrediction(null);
+      return;
+    }
+
+    setError(null);
+
+    try {
+      const prediction = await predictNextItemPriceWithMl(itemId);
+      setMlItemPrediction(prediction);
+    } catch (currentError) {
+      setMlItemPrediction(null);
+      setError(
+        currentError instanceof Error
+          ? currentError.message
+          : "Failed to get ML price prediction",
       );
     }
   }
@@ -1289,6 +1349,55 @@ export default function App() {
                     </table>
                   </div>
                 </div>
+              </div>
+
+              <div className="rounded-2xl border border-[#eee6d6] bg-white p-4">
+                <div className="mb-3 flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
+                  <h3 className="text-sm font-black uppercase tracking-wide text-[#6b6254]">
+                    ML price model
+                  </h3>
+
+                  <button
+                    className="secondary-small-button"
+                    disabled={isSaving}
+                    onClick={() => void handleTrainPriceModel()}
+                  >
+                    Train model
+                  </button>
+                </div>
+
+                {mlItemPrediction ? (
+                  <div className="rounded-2xl bg-[#f8f4ea] p-4">
+                    <p className="text-sm text-[#6b6254]">
+                      {mlItemPrediction.item_name}
+                    </p>
+                    <p className="mt-1 text-3xl font-black text-[#1f1f1f]">
+                      {currencyFormatter.format(
+                        mlItemPrediction.predicted_price_per_unit,
+                      )}
+                    </p>
+                    <p className="mt-2 text-sm text-[#6b6254]">
+                      Per {mlItemPrediction.unit} · {mlItemPrediction.method}
+                    </p>
+                    <p className="mt-2 text-sm text-[#6b6254]">
+                      Training rows: {mlItemPrediction.model.training_rows}
+                    </p>
+                    <p className="mt-2 text-sm text-[#6b6254]">
+                      MAE: {mlItemPrediction.model.metrics.mae ?? "—"} · R²:{" "}
+                      {mlItemPrediction.model.metrics.r2 ?? "—"}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="rounded-2xl bg-[#f8f4ea] p-4 text-sm text-[#6b6254]">
+                    Train the model, then select an item with price history.
+                  </div>
+                )}
+
+                {modelTrainingResult ? (
+                  <p className="mt-3 text-xs text-[#6b6254]">
+                    Last trained with {modelTrainingResult.training_rows} rows.
+                  </p>
+                ) : null}
               </div>
             </section>
 

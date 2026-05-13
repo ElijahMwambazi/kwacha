@@ -2,6 +2,8 @@ import { apiRequest } from "./client";
 import type {
   BasketTotalPrediction,
   ItemPricePrediction,
+  MLItemPricePrediction,
+  PriceModelTrainingResult,
 } from "../types/prediction";
 
 export function predictNextItemPrice(
@@ -18,5 +20,22 @@ export function predictNextBasketTotal(
 ): Promise<BasketTotalPrediction> {
   return apiRequest<BasketTotalPrediction>(
     `/predictions/basket/next-total?window=${window}`,
+  );
+}
+
+export function trainPriceModel(): Promise<PriceModelTrainingResult> {
+  return apiRequest<PriceModelTrainingResult>(
+    "/predictions/train-price-model",
+    {
+      method: "POST",
+    },
+  );
+}
+
+export function predictNextItemPriceWithMl(
+  itemId: number,
+): Promise<MLItemPricePrediction> {
+  return apiRequest<MLItemPricePrediction>(
+    `/predictions/items/${itemId}/ml-next-price`,
   );
 }

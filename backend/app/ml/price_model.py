@@ -179,8 +179,6 @@ def train_price_model(session: Session) -> dict[str, Any]:
 
     pipeline = create_model_pipeline()
 
-    metrics: dict[str, float | None]
-
     if len(frame) >= 5:
         x_train, x_test, y_train, y_test = train_test_split(
             x,
@@ -192,7 +190,7 @@ def train_price_model(session: Session) -> dict[str, Any]:
         pipeline.fit(x_train, y_train)
         predictions = pipeline.predict(x_test)
 
-        metrics = {
+        metrics: dict[str, float | None] = {
             "mae": round(float(mean_absolute_error(y_test, predictions)), 4),
             "r2": round(float(r2_score(y_test, predictions)), 4),
         }

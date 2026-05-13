@@ -6,6 +6,7 @@ from sqlmodel import Session, select
 from app.database import get_session
 from app.models.item import Item
 from app.models.price_observation import PriceObservation
+from app.ml.price_model import predict_next_price_with_model, train_price_model
 
 router = APIRouter(prefix="/predictions", tags=["predictions"])
 
@@ -174,3 +175,37 @@ def predict_next_basket_total(
         "currency": "ZMW",
         "items": lines,
     }
+
+@router.post("/train-price-model", status_code=status.HTTP_201_CREATED)
+def train_price_prediction_model(
+    session: Session = Depends(get_session),
+) -> dict[str, Any]:
+    try:
+        return train_price_model(session)
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        ) from error
+
+
+@router.get("/items/{item_id}/ml-next-price")
+def predict_next_item_price_with_ml(
+    item_id: int,
+    session: Session = Depends(get_session),
+) -> dict[str, Any]:
+    try:
+        return predict_next_price_with_model(
+            session=session,
+            item_id=item_id,
+        )
+    except FileNotFoundError as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(error),
+        ) from error
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(error),
+        ) from error

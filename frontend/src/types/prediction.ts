@@ -31,3 +31,31 @@ export type BasketTotalPrediction = {
   currency: "ZMW";
   items: BasketPredictionLine[];
 };
+
+export type PriceModelTrainingResult = {
+  model_path: string;
+  trained_at: string;
+  training_rows: number;
+  metrics: {
+    mae: number | null;
+    r2: number | null;
+  };
+};
+
+export type MLItemPricePrediction = {
+  item_id: number;
+  item_name: string;
+  method: "random_forest_regressor";
+  predicted_price_per_unit: number;
+  latest_price_per_unit: number;
+  unit: string;
+  latest_observed_at: string;
+  model: {
+    trained_at: string;
+    training_rows: number;
+    metrics: {
+      mae: number | null;
+      r2: number | null;
+    };
+  };
+};
