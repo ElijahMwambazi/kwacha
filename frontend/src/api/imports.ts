@@ -7,6 +7,8 @@ export type ImportPriceCsvResult = {
   created_item_count: number;
 };
 
+export type ImportTemplateKind = "prices";
+
 export async function importPriceObservationsCsv(
   file: File,
 ): Promise<ImportPriceCsvResult> {
@@ -37,4 +39,26 @@ export async function importPriceObservationsCsv(
   }
 
   return response.json() as Promise<ImportPriceCsvResult>;
+}
+
+export async function downloadImportTemplate(
+  kind: ImportTemplateKind,
+): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/imports/${kind}-template.csv`);
+
+  if (!response.ok) {
+    throw new Error(`Failed to download ${kind} import template`);
+  }
+
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "kwacha_price_import_template.csv";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+
+  window.URL.revokeObjectURL(url);
 }

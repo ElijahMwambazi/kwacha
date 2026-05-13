@@ -4,6 +4,7 @@ from io import StringIO
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select
 
 from app.database import get_session
@@ -21,6 +22,14 @@ REQUIRED_PRICE_COLUMNS = {
     "unit",
 }
 
+def csv_response(content: str, filename: str) -> StreamingResponse:
+    return StreamingResponse(
+        iter([content]),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+        },
+    )
 
 def parse_optional_text(value: str | None) -> str | None:
     if value is None:
@@ -117,6 +126,54 @@ def list_imports():
         ]
     }
 
+@router.get("/prices-template.csv")
+def download_price_import_template():
+    output = StringIO()
+    writer = csv.writer(output)
+
+    writer.writerow(
+        [
+            "item_name",
+            "category",
+            "brand",
+            "shop_name",
+            "location",
+            "price",
+            "quantity",
+            "unit",
+            "observed_at",
+        ]
+    )
+
+    writer.writerow(
+        [
+            "Mealie Meal",
+            "Food",
+            "Breakfast",
+            "Shoprite",
+            "Lusaka",
+            "250",
+            "25",
+            "kg",
+            "2026-05-13T08:00:00",
+        ]
+    )
+
+    writer.writerow(
+        [
+            "Sugar",
+            "Food",
+            "",
+            "Pick n Pay",
+            "Lusaka",
+            "55",
+            "2",
+            "kg",
+            "2026-05-13T08:00:00",
+        ]
+    )
+
+    return csv_response(output.getvalue(), "kwacha_price_import_template.csv")
 
 @router.post("/prices.csv", status_code=status.HTTP_201_CREATED)
 async def import_price_observations_csv(

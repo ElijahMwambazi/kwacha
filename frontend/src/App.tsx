@@ -29,7 +29,10 @@ import {
   updatePriceObservation,
 } from "./api/prices";
 import { downloadCsv, type ExportKind } from "./api/export";
-import { importPriceObservationsCsv } from "./api/imports";
+import {
+  downloadImportTemplate,
+  importPriceObservationsCsv,
+} from "./api/imports";
 import type {
   AnalyticsSummary,
   BasketInflationPoint,
@@ -262,6 +265,20 @@ export default function App() {
       );
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  async function handleDownloadPriceImportTemplate() {
+    setError(null);
+
+    try {
+      await downloadImportTemplate("prices");
+    } catch (currentError) {
+      setError(
+        currentError instanceof Error
+          ? currentError.message
+          : "Failed to download import template",
+      );
     }
   }
 
@@ -655,6 +672,13 @@ export default function App() {
                 onChange={(event) => void handleImportPricesCsv(event)}
               />
             </label>
+
+            <button
+              className="w-fit rounded-xl border border-[#d8cdb7] bg-[#fffdf8] px-4 py-2.5 font-bold text-[#1f1f1f] shadow-sm transition hover:bg-white"
+              onClick={() => void handleDownloadPriceImportTemplate()}
+            >
+              Download import template
+            </button>
           </div>
         </header>
 

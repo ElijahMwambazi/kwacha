@@ -88,3 +88,16 @@ def test_import_price_observations_csv_requires_expected_columns(
 
     assert response.status_code == 400
     assert "Missing required columns" in response.json()["detail"]
+
+def test_download_price_import_template(client: TestClient) -> None:
+    response = client.get("/imports/prices-template.csv")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/csv")
+    assert "kwacha_price_import_template.csv" in response.headers["content-disposition"]
+
+    assert "item_name" in response.text
+    assert "shop_name" in response.text
+    assert "price" in response.text
+    assert "quantity" in response.text
+    assert "Mealie Meal" in response.text
