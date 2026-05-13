@@ -1,8 +1,11 @@
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
 
 from app.database import get_session
+from app.models.basket import BasketItem
 from app.models.item import Item, ItemCreate, ItemRead, ItemUpdate
+from app.models.price_observation import PriceObservation
 
 router = APIRouter(prefix="/items", tags=["items"])
 
@@ -34,10 +37,10 @@ def get_item(
     item = session.get(Item, item_id)
 
     if not item:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Item not found",
-        )
+      raise HTTPException(
+          status_code=status.HTTP_404_NOT_FOUND,
+          detail="Item not found",
+      )
 
     return item
 
@@ -80,6 +83,20 @@ def delete_item(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Item not found",
         )
+
+    basket_items = session.exec(
+        select(BasketItem).where(BasketItem.item_id == item_id)
+    ).all()
+
+    price_observations = session.exec(
+        select(PriceObservation).where(PriceObservation.item_id == item_id)
+    ).all()
+
+    for basket_item in basket_items:
+        session.delete(basket_item)
+
+    for price_observation in price_observations:
+        session.delete(price_observation)
 
     session.delete(item)
     session.commit()

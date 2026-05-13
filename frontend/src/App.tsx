@@ -263,7 +263,7 @@ export default function App() {
 
   async function handleDeleteItem(item: Item) {
     const confirmed = window.confirm(
-      `Delete "${item.name}"? This may fail if the item has price observations or basket entries.`,
+      `Delete "${item.name}"? This will also delete related price observations and basket entries.`,
     );
 
     if (!confirmed) {
