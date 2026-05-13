@@ -33,6 +33,11 @@ import {
   downloadImportTemplate,
   importPriceObservationsCsv,
 } from "./api/imports";
+import {
+  createIndicator,
+  deleteIndicator,
+  listIndicators,
+} from "./api/indicators";
 import type {
   AnalyticsSummary,
   BasketInflationPoint,
@@ -42,6 +47,7 @@ import type {
 import type { BasketItem, BasketTotal } from "./types/basket";
 import type { Item } from "./types/item";
 import type { PriceObservation } from "./types/price";
+import type { PublicIndicator } from "./types/indicators";
 
 type ItemFormState = {
   name: string;
@@ -65,6 +71,14 @@ type BasketFormState = {
   unit: string;
 };
 
+type IndicatorFormState = {
+  name: string;
+  value: string;
+  unit: string;
+  source: string;
+  observed_at: string;
+};
+
 const initialItemForm: ItemFormState = {
   name: "",
   category: "",
@@ -85,6 +99,14 @@ const initialBasketForm: BasketFormState = {
   item_id: "",
   quantity: "1",
   unit: "unit",
+};
+
+const initialIndicatorForm: IndicatorFormState = {
+  name: "exchange_rate_usd_zmw",
+  value: "",
+  unit: "ZMW",
+  source: "",
+  observed_at: "",
 };
 
 const currencyFormatter = new Intl.NumberFormat("en-ZM", {
@@ -120,6 +142,10 @@ export default function App() {
   const [basketInflation, setBasketInflation] = useState<
     BasketInflationPoint[]
   >([]);
+
+  const [indicators, setIndicators] = useState<PublicIndicator[]>([]);
+  const [indicatorForm, setIndicatorForm] =
+    useState<IndicatorFormState>(initialIndicatorForm);
 
   const itemNameById = useMemo(() => {
     return new Map(items.map((item) => [item.id, item.name]));
@@ -158,6 +184,7 @@ export default function App() {
       nextPriceTrends,
       nextShopComparison,
       nextBasketInflation,
+      nextIndicators,
     ] = await Promise.all([
       listItems(),
       listPriceObservations(),
@@ -167,6 +194,7 @@ export default function App() {
       getPriceTrends(analyticsItemId),
       getShopComparison(analyticsItemId),
       getBasketInflation(),
+      listIndicators(),
     ]);
 
     setItems(nextItems);
@@ -177,6 +205,7 @@ export default function App() {
     setPriceTrends(nextPriceTrends);
     setShopComparison(nextShopComparison);
     setBasketInflation(nextBasketInflation);
+    setIndicators(nextIndicators);
   }
 
   useEffect(() => {
@@ -616,6 +645,71 @@ export default function App() {
     }
   }
 
+  async function handleCreateIndicator(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const value = Number(indicatorForm.value);
+
+    if (!indicatorForm.name.trim() || !value) {
+      setError("Indicator name and value are required");
+      return;
+    }
+
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      await createIndicator({
+        name: indicatorForm.name.trim(),
+        value,
+        unit: indicatorForm.unit.trim() || null,
+        source: indicatorForm.source.trim() || null,
+        observed_at: indicatorForm.observed_at || undefined,
+      });
+
+      setIndicatorForm({
+        ...initialIndicatorForm,
+        name: indicatorForm.name,
+        unit: indicatorForm.unit,
+        source: indicatorForm.source,
+      });
+
+      await refreshData();
+    } catch (currentError) {
+      setError(
+        currentError instanceof Error
+          ? currentError.message
+          : "Failed to create public indicator",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleDeleteIndicator(indicator: PublicIndicator) {
+    const confirmed = window.confirm(`Delete indicator "${indicator.name}"?`);
+
+    if (!confirmed) {
+      return;
+    }
+
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      await deleteIndicator(indicator.id);
+      await refreshData();
+    } catch (currentError) {
+      setError(
+        currentError instanceof Error
+          ? currentError.message
+          : "Failed to delete public indicator",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   return (
     <main className="min-h-screen bg-[#f8f4ea] px-4 py-6 text-[#1f1f1f] sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl">
@@ -932,6 +1026,162 @@ export default function App() {
                           <tr>
                             <td className="empty-cell" colSpan={4}>
                               No basket inflation data yet.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section className="card">
+              <div className="mb-4">
+                <h2 className="section-title mb-1">Public indicators</h2>
+                <p className="text-sm text-[#6b6254]">
+                  Track external signals like exchange rate, fuel price, and
+                  official inflation.
+                </p>
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-[0.8fr_1.2fr]">
+                <form
+                  className="rounded-2xl border border-[#eee6d6] bg-white p-4"
+                  onSubmit={handleCreateIndicator}
+                >
+                  <h3 className="mb-3 text-sm font-black uppercase tracking-wide text-[#6b6254]">
+                    Add indicator
+                  </h3>
+
+                  <label className="form-label">
+                    Indicator
+                    <select
+                      className="form-input"
+                      value={indicatorForm.name}
+                      onChange={(event) =>
+                        setIndicatorForm((current) => ({
+                          ...current,
+                          name: event.target.value,
+                        }))
+                      }
+                    >
+                      <option value="exchange_rate_usd_zmw">
+                        USD/ZMW exchange rate
+                      </option>
+                      <option value="fuel_price_petrol">
+                        Fuel price - petrol
+                      </option>
+                      <option value="fuel_price_diesel">
+                        Fuel price - diesel
+                      </option>
+                      <option value="official_inflation">
+                        Official inflation
+                      </option>
+                    </select>
+                  </label>
+
+                  <TextInput
+                    label="Value"
+                    type="number"
+                    value={indicatorForm.value}
+                    onChange={(value) =>
+                      setIndicatorForm((current) => ({ ...current, value }))
+                    }
+                    placeholder="25.50"
+                  />
+
+                  <TextInput
+                    label="Unit"
+                    value={indicatorForm.unit}
+                    onChange={(value) =>
+                      setIndicatorForm((current) => ({
+                        ...current,
+                        unit: value,
+                      }))
+                    }
+                    placeholder="ZMW"
+                  />
+
+                  <TextInput
+                    label="Source"
+                    value={indicatorForm.source}
+                    onChange={(value) =>
+                      setIndicatorForm((current) => ({
+                        ...current,
+                        source: value,
+                      }))
+                    }
+                    placeholder="BOZ, ERB, ZamStats"
+                  />
+
+                  <label className="form-label">
+                    Observed at
+                    <input
+                      className="form-input"
+                      type="datetime-local"
+                      value={indicatorForm.observed_at}
+                      onChange={(event) =>
+                        setIndicatorForm((current) => ({
+                          ...current,
+                          observed_at: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <button className="primary-button" disabled={isSaving}>
+                    Save indicator
+                  </button>
+                </form>
+
+                <div className="rounded-2xl border border-[#eee6d6] bg-white p-4">
+                  <h3 className="mb-3 text-sm font-black uppercase tracking-wide text-[#6b6254]">
+                    Recent indicators
+                  </h3>
+
+                  <div className="overflow-x-auto">
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Value</TableHead>
+                          <TableHead>Source</TableHead>
+                          <TableHead>Observed</TableHead>
+                          <TableHead>Action</TableHead>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {indicators.length ? (
+                          indicators.slice(0, 10).map((indicator) => (
+                            <tr key={indicator.id}>
+                              <TableCell>{indicator.name}</TableCell>
+                              <TableCell>
+                                {indicator.value} {indicator.unit ?? ""}
+                              </TableCell>
+                              <TableCell>{indicator.source ?? "—"}</TableCell>
+                              <TableCell>
+                                {dateFormatter.format(
+                                  new Date(indicator.observed_at),
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <button
+                                  className="danger-button"
+                                  disabled={isSaving}
+                                  onClick={() =>
+                                    void handleDeleteIndicator(indicator)
+                                  }
+                                >
+                                  Delete
+                                </button>
+                              </TableCell>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td className="empty-cell" colSpan={5}>
+                              No public indicators yet.
                             </td>
                           </tr>
                         )}
