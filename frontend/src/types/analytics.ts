@@ -30,3 +30,11 @@ export type ShopComparison = {
   max_price_per_unit: number;
   avg_price_per_unit: number;
 };
+
+export type BasketInflationPoint = {
+  month: string;
+  basket_total: number;
+  monthly_change_percent: number | null;
+  priced_items_count: number;
+  missing_items_count: number;
+};

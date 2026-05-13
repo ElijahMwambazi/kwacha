@@ -1,6 +1,7 @@
 import { apiRequest } from "./client";
 import type {
   AnalyticsSummary,
+  BasketInflationPoint,
   PriceTrendPoint,
   ShopComparison,
 } from "../types/analytics";
@@ -17,4 +18,8 @@ export function getPriceTrends(itemId?: number): Promise<PriceTrendPoint[]> {
 export function getShopComparison(itemId?: number): Promise<ShopComparison[]> {
   const query = itemId ? `?item_id=${itemId}` : "";
   return apiRequest<ShopComparison[]>(`/analytics/shop-comparison${query}`);
+}
+
+export function getBasketInflation(): Promise<BasketInflationPoint[]> {
+  return apiRequest<BasketInflationPoint[]>("/analytics/basket-inflation");
 }

@@ -10,6 +10,7 @@ import {
 
 import {
   getAnalyticsSummary,
+  getBasketInflation,
   getPriceTrends,
   getShopComparison,
 } from "./api/analytics";
@@ -30,6 +31,7 @@ import {
 import { downloadCsv, type ExportKind } from "./api/export";
 import type {
   AnalyticsSummary,
+  BasketInflationPoint,
   PriceTrendPoint,
   ShopComparison,
 } from "./types/analytics";
@@ -111,6 +113,9 @@ export default function App() {
   const [shopComparison, setShopComparison] = useState<ShopComparison[]>([]);
   const [selectedAnalyticsItemId, setSelectedAnalyticsItemId] =
     useState<string>("");
+  const [basketInflation, setBasketInflation] = useState<
+    BasketInflationPoint[]
+  >([]);
 
   const itemNameById = useMemo(() => {
     return new Map(items.map((item) => [item.id, item.name]));
@@ -122,6 +127,16 @@ export default function App() {
       observed_label: dateFormatter.format(new Date(point.observed_at)),
     }));
   }, [priceTrends]);
+
+  const basketInflationChartData = useMemo(() => {
+    return basketInflation.map((point) => ({
+      ...point,
+      monthly_change_label:
+        point.monthly_change_percent === null
+          ? "—"
+          : `${point.monthly_change_percent}%`,
+    }));
+  }, [basketInflation]);
 
   async function refreshData(itemIdForAnalytics = selectedAnalyticsItemId) {
     setError(null);
@@ -138,6 +153,7 @@ export default function App() {
       nextSummary,
       nextPriceTrends,
       nextShopComparison,
+      nextBasketInflation,
     ] = await Promise.all([
       listItems(),
       listPriceObservations(),
@@ -146,6 +162,7 @@ export default function App() {
       getAnalyticsSummary(),
       getPriceTrends(analyticsItemId),
       getShopComparison(analyticsItemId),
+      getBasketInflation(),
     ]);
 
     setItems(nextItems);
@@ -155,6 +172,7 @@ export default function App() {
     setSummary(nextSummary);
     setPriceTrends(nextPriceTrends);
     setShopComparison(nextShopComparison);
+    setBasketInflation(nextBasketInflation);
   }
 
   useEffect(() => {
@@ -732,6 +750,120 @@ export default function App() {
                           <tr>
                             <td className="empty-cell" colSpan={3}>
                               No shop comparison data yet.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section className="card">
+              <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                <div>
+                  <h2 className="section-title mb-1">Basket inflation</h2>
+                  <p className="text-sm text-[#6b6254]">
+                    Track basket cost changes month by month using the latest
+                    available item prices.
+                  </p>
+                </div>
+
+                <strong className="text-2xl font-black text-[#8a6d1d]">
+                  {basketInflation.length
+                    ? currencyFormatter.format(
+                        basketInflation[basketInflation.length - 1]
+                          .basket_total,
+                      )
+                    : currencyFormatter.format(0)}
+                </strong>
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+                <div className="rounded-2xl border border-[#eee6d6] bg-white p-4">
+                  <h3 className="mb-3 text-sm font-black uppercase tracking-wide text-[#6b6254]">
+                    Monthly basket cost
+                  </h3>
+
+                  {basketInflationChartData.length ? (
+                    <div className="h-72">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={basketInflationChartData}>
+                          <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                          <YAxis tick={{ fontSize: 12 }} />
+                          <Tooltip
+                            formatter={(value, name) => {
+                              if (
+                                name === "basket_total" &&
+                                typeof value === "number"
+                              ) {
+                                return [
+                                  currencyFormatter.format(value),
+                                  "Basket total",
+                                ];
+                              }
+
+                              return [value, name];
+                            }}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="basket_total"
+                            name="Basket total"
+                            strokeWidth={3}
+                            dot
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : (
+                    <div className="flex h-72 items-center justify-center rounded-xl bg-[#f8f4ea] text-sm text-[#6b6254]">
+                      No basket inflation data yet.
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-2xl border border-[#eee6d6] bg-white p-4">
+                  <h3 className="mb-3 text-sm font-black uppercase tracking-wide text-[#6b6254]">
+                    Monthly movement
+                  </h3>
+
+                  <div className="overflow-x-auto">
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <TableHead>Month</TableHead>
+                          <TableHead>Total</TableHead>
+                          <TableHead>Change</TableHead>
+                          <TableHead>Coverage</TableHead>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {basketInflation.length ? (
+                          basketInflation.map((point) => (
+                            <tr key={point.month}>
+                              <TableCell>{point.month}</TableCell>
+                              <TableCell>
+                                {currencyFormatter.format(point.basket_total)}
+                              </TableCell>
+                              <TableCell>
+                                {point.monthly_change_percent === null
+                                  ? "—"
+                                  : `${point.monthly_change_percent}%`}
+                              </TableCell>
+                              <TableCell>
+                                {point.priced_items_count} priced
+                                {point.missing_items_count
+                                  ? `, ${point.missing_items_count} missing`
+                                  : ""}
+                              </TableCell>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td className="empty-cell" colSpan={4}>
+                              No basket inflation data yet.
                             </td>
                           </tr>
                         )}
