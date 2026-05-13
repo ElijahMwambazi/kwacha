@@ -805,6 +805,13 @@ export default function App() {
             >
               Download import template
             </button>
+
+            <button
+              className="w-fit rounded-xl border border-[#d8cdb7] bg-[#fffdf8] px-4 py-2.5 font-bold text-[#1f1f1f] shadow-sm transition hover:bg-white"
+              onClick={() => void handleExport("ml-prices")}
+            >
+              Export ML dataset
+            </button>
           </div>
         </header>
 

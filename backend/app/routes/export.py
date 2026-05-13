@@ -9,6 +9,7 @@ from app.database import get_session
 from app.models.basket import BasketItem
 from app.models.item import Item
 from app.models.price_observation import PriceObservation
+from app.models.public_indicator import PublicIndicator
 
 router = APIRouter(prefix="/export", tags=["export"])
 
@@ -22,6 +23,26 @@ def csv_response(content: str, filename: str) -> StreamingResponse:
         },
     )
 
+def get_latest_indicator_value(
+    *,
+    session: Session,
+    name: str,
+    observed_at,
+) -> float | None:
+    indicator = session.exec(
+        select(PublicIndicator)
+        .where(PublicIndicator.name == name)
+        .where(PublicIndicator.observed_at <= observed_at)
+        .order_by(
+            PublicIndicator.observed_at.desc(),
+            PublicIndicator.id.desc(),
+        )
+    ).first()
+
+    if not indicator:
+        return None
+
+    return indicator.value
 
 @router.get("/items.csv")
 def export_items(
@@ -203,3 +224,94 @@ def export_basket(
         )
 
     return csv_response(output.getvalue(), "kwacha_basket.csv")
+
+@router.get("/ml-prices.csv")
+def export_ml_price_dataset(
+    session: Session = Depends(get_session),
+):
+    output = StringIO()
+    writer = csv.writer(output)
+
+    writer.writerow(
+        [
+            "price_observation_id",
+            "item_id",
+            "item_name",
+            "category",
+            "brand",
+            "shop_name",
+            "location",
+            "price",
+            "quantity",
+            "unit",
+            "price_per_unit",
+            "observed_at",
+            "observed_year",
+            "observed_month",
+            "observed_day",
+            "exchange_rate_usd_zmw",
+            "fuel_price_petrol",
+            "fuel_price_diesel",
+            "official_inflation",
+        ]
+    )
+
+    rows = session.exec(
+        select(PriceObservation, Item)
+        .join(Item, PriceObservation.item_id == Item.id)
+        .order_by(
+            PriceObservation.observed_at.asc(),
+            PriceObservation.id.asc(),
+        )
+    ).all()
+
+    for observation, item in rows:
+        exchange_rate = get_latest_indicator_value(
+            session=session,
+            name="exchange_rate_usd_zmw",
+            observed_at=observation.observed_at,
+        )
+
+        petrol_price = get_latest_indicator_value(
+            session=session,
+            name="fuel_price_petrol",
+            observed_at=observation.observed_at,
+        )
+
+        diesel_price = get_latest_indicator_value(
+            session=session,
+            name="fuel_price_diesel",
+            observed_at=observation.observed_at,
+        )
+
+        official_inflation = get_latest_indicator_value(
+            session=session,
+            name="official_inflation",
+            observed_at=observation.observed_at,
+        )
+
+        writer.writerow(
+            [
+                observation.id,
+                observation.item_id,
+                item.name,
+                item.category,
+                item.brand,
+                observation.shop_name,
+                observation.location,
+                observation.price,
+                observation.quantity,
+                observation.unit,
+                observation.price_per_unit,
+                observation.observed_at,
+                observation.observed_at.year,
+                observation.observed_at.month,
+                observation.observed_at.day,
+                exchange_rate,
+                petrol_price,
+                diesel_price,
+                official_inflation,
+            ]
+        )
+
+    return csv_response(output.getvalue(), "kwacha_ml_prices.csv")

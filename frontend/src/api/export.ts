@@ -2,12 +2,13 @@ const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "") ??
   "http://localhost:8000";
 
-export type ExportKind = "items" | "prices" | "basket";
+export type ExportKind = "items" | "prices" | "basket" | "ml-prices";
 
 const filenames: Record<ExportKind, string> = {
   items: "kwacha_items.csv",
   prices: "kwacha_price_observations.csv",
   basket: "kwacha_basket.csv",
+  "ml-prices": "kwacha_ml_prices.csv",
 };
 
 export async function downloadCsv(kind: ExportKind): Promise<void> {
