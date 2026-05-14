@@ -68,3 +68,14 @@ export type ItemPredictionComparison = {
   ml: MLItemPricePrediction | null;
   ml_error: string | null;
 };
+
+export type PriceModelStatus = {
+  is_trained: boolean;
+  model_path: string;
+  trained_at: string | null;
+  training_rows: number;
+  metrics: {
+    mae: number | null;
+    r2: number | null;
+  } | null;
+};

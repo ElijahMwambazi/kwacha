@@ -6,7 +6,12 @@ from sqlmodel import Session, select
 from app.database import get_session
 from app.models.item import Item
 from app.models.price_observation import PriceObservation
-from app.ml.price_model import predict_next_price_with_model, train_price_model
+from app.ml.price_model import (
+    delete_price_model,
+    get_price_model_status,
+    predict_next_price_with_model,
+    train_price_model,
+)
 
 router = APIRouter(prefix="/predictions", tags=["predictions"])
 
@@ -175,6 +180,15 @@ def predict_next_basket_total(
         "currency": "ZMW",
         "items": lines,
     }
+
+@router.get("/price-model/status")
+def get_price_prediction_model_status() -> dict[str, Any]:
+    return get_price_model_status()
+
+
+@router.delete("/price-model", status_code=status.HTTP_200_OK)
+def reset_price_prediction_model() -> dict[str, Any]:
+    return delete_price_model()
 
 @router.post("/train-price-model", status_code=status.HTTP_201_CREATED)
 def train_price_prediction_model(

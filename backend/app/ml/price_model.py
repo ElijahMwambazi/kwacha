@@ -226,6 +226,38 @@ def load_price_model_bundle() -> dict[str, Any]:
 
     return joblib.load(MODEL_PATH)
 
+def get_price_model_status() -> dict[str, Any]:
+    if not Path(MODEL_PATH).exists():
+        return {
+            "is_trained": False,
+            "model_path": str(MODEL_PATH),
+            "trained_at": None,
+            "training_rows": 0,
+            "metrics": None,
+        }
+
+    bundle = load_price_model_bundle()
+
+    return {
+        "is_trained": True,
+        "model_path": str(MODEL_PATH),
+        "trained_at": bundle["trained_at"],
+        "training_rows": bundle["training_rows"],
+        "metrics": bundle["metrics"],
+    }
+
+
+def delete_price_model() -> dict[str, Any]:
+    if Path(MODEL_PATH).exists():
+        Path(MODEL_PATH).unlink()
+
+    return {
+        "is_trained": False,
+        "model_path": str(MODEL_PATH),
+        "trained_at": None,
+        "training_rows": 0,
+        "metrics": None,
+    }
 
 def predict_next_price_with_model(
     *,

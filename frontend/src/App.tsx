@@ -41,9 +41,11 @@ import {
 } from "./api/indicators";
 import {
   compareItemPricePredictions,
+  getPriceModelStatus,
   predictNextBasketTotal,
   predictNextItemPrice,
   predictNextItemPriceWithMl,
+  resetPriceModel,
   trainPriceModel,
 } from "./api/predictions";
 import type {
@@ -62,6 +64,7 @@ import type {
   ItemPredictionComparison,
   ItemPricePrediction,
   MLItemPricePrediction,
+  PriceModelStatus,
   PriceModelTrainingResult,
 } from "./types/prediction";
 
@@ -182,6 +185,8 @@ export default function App() {
     useState<PriceModelTrainingResult | null>(null);
   const [predictionComparison, setPredictionComparison] =
     useState<ItemPredictionComparison | null>(null);
+  const [priceModelStatus, setPriceModelStatus] =
+    useState<PriceModelStatus | null>(null);
 
   const itemNameById = useMemo(() => {
     return new Map(items.map((item) => [item.id, item.name]));
@@ -231,6 +236,7 @@ export default function App() {
       nextIndicators,
       nextIndicatorTrends,
       nextBasketPrediction,
+      nextPriceModelStatus,
     ] = await Promise.all([
       listItems(),
       listPriceObservations(),
@@ -243,6 +249,7 @@ export default function App() {
       listIndicators(),
       getIndicatorTrends(indicatorName),
       predictNextBasketTotal(Number(predictionWindow) || 3).catch(() => null),
+      getPriceModelStatus(),
     ]);
 
     setItems(nextItems);
@@ -256,6 +263,7 @@ export default function App() {
     setIndicators(nextIndicators);
     setIndicatorTrends(nextIndicatorTrends);
     setBasketPrediction(nextBasketPrediction);
+    setPriceModelStatus(nextPriceModelStatus);
   }
 
   useEffect(() => {
@@ -853,6 +861,41 @@ export default function App() {
     }
   }
 
+  async function handleResetPriceModel() {
+    const confirmed = window.confirm("Reset the trained price model?");
+
+    if (!confirmed) {
+      return;
+    }
+
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      const status = await resetPriceModel();
+
+      setPriceModelStatus(status);
+      setMlItemPrediction(null);
+      setPredictionComparison((current) =>
+        current
+          ? {
+              ...current,
+              ml: null,
+              ml_error: "Price model has not been trained yet",
+            }
+          : null,
+      );
+    } catch (currentError) {
+      setError(
+        currentError instanceof Error
+          ? currentError.message
+          : "Failed to reset price model",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   async function handlePredictItemPriceWithMl(
     itemIdValue = selectedPredictionItemId,
   ) {
@@ -1305,17 +1348,34 @@ export default function App() {
 
                 <div className="rounded-2xl border border-[#eee6d6] bg-white p-4">
                   <div className="mb-3 flex items-center justify-between gap-2">
-                    <h3 className="text-sm font-black uppercase tracking-wide text-[#6b6254]">
-                      ML model
-                    </h3>
+                    <div>
+                      <h3 className="text-sm font-black uppercase tracking-wide text-[#6b6254]">
+                        ML model
+                      </h3>
+                      <p className="mt-1 text-xs text-[#6b6254]">
+                        {priceModelStatus?.is_trained
+                          ? `Trained with ${priceModelStatus.training_rows} rows`
+                          : "Not trained yet"}
+                      </p>
+                    </div>
 
-                    <button
-                      className="secondary-small-button"
-                      disabled={isSaving}
-                      onClick={() => void handleTrainPriceModel()}
-                    >
-                      Train
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        className="secondary-small-button"
+                        disabled={isSaving}
+                        onClick={() => void handleTrainPriceModel()}
+                      >
+                        Train
+                      </button>
+
+                      <button
+                        className="danger-button"
+                        disabled={isSaving || !priceModelStatus?.is_trained}
+                        onClick={() => void handleResetPriceModel()}
+                      >
+                        Reset
+                      </button>
+                    </div>
                   </div>
 
                   {mlItemPrediction ? (

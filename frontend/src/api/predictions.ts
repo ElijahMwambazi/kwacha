@@ -4,6 +4,7 @@ import type {
   ItemPredictionComparison,
   ItemPricePrediction,
   MLItemPricePrediction,
+  PriceModelStatus,
   PriceModelTrainingResult,
 } from "../types/prediction";
 
@@ -48,4 +49,14 @@ export function compareItemPricePredictions(
   return apiRequest<ItemPredictionComparison>(
     `/predictions/items/${itemId}/compare?window=${window}`,
   );
+}
+
+export function getPriceModelStatus(): Promise<PriceModelStatus> {
+  return apiRequest<PriceModelStatus>("/predictions/price-model/status");
+}
+
+export function resetPriceModel(): Promise<PriceModelStatus> {
+  return apiRequest<PriceModelStatus>("/predictions/price-model", {
+    method: "DELETE",
+  });
 }
