@@ -209,3 +209,37 @@ def predict_next_item_price_with_ml(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(error),
         ) from error
+
+@router.get("/items/{item_id}/compare")
+def compare_item_price_predictions(
+    item_id: int,
+    window: int = Query(default=3, ge=1, le=30),
+    session: Session = Depends(get_session),
+) -> dict[str, Any]:
+    baseline = predict_next_item_price(
+        item_id=item_id,
+        window=window,
+        session=session,
+    )
+
+    ml_prediction = None
+    ml_error = None
+
+    try:
+        ml_prediction = predict_next_price_with_model(
+            session=session,
+            item_id=item_id,
+        )
+    except FileNotFoundError as error:
+        ml_error = str(error)
+    except ValueError as error:
+        ml_error = str(error)
+
+    return {
+        "item_id": baseline["item_id"],
+        "item_name": baseline["item_name"],
+        "unit": baseline["unit"],
+        "baseline": baseline,
+        "ml": ml_prediction,
+        "ml_error": ml_error,
+    }

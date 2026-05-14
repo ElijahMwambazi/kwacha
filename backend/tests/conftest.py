@@ -8,6 +8,7 @@ from sqlmodel.pool import StaticPool
 from app.database import get_session
 from app.main import app
 from app.models import *  # noqa: F403
+from app.ml.price_model import MODEL_PATH
 
 
 @pytest.fixture(name="session")
@@ -36,3 +37,13 @@ def client_fixture(session: Session) -> Generator[TestClient, None, None]:
     yield client
 
     app.dependency_overrides.clear()
+
+@pytest.fixture(autouse=True)
+def clean_trained_model_file():
+    if MODEL_PATH.exists():
+        MODEL_PATH.unlink()
+
+    yield
+
+    if MODEL_PATH.exists():
+        MODEL_PATH.unlink()

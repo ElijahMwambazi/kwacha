@@ -59,3 +59,12 @@ export type MLItemPricePrediction = {
     };
   };
 };
+
+export type ItemPredictionComparison = {
+  item_id: number;
+  item_name: string;
+  unit: string;
+  baseline: ItemPricePrediction;
+  ml: MLItemPricePrediction | null;
+  ml_error: string | null;
+};

@@ -1,6 +1,7 @@
 import { apiRequest } from "./client";
 import type {
   BasketTotalPrediction,
+  ItemPredictionComparison,
   ItemPricePrediction,
   MLItemPricePrediction,
   PriceModelTrainingResult,
@@ -37,5 +38,14 @@ export function predictNextItemPriceWithMl(
 ): Promise<MLItemPricePrediction> {
   return apiRequest<MLItemPricePrediction>(
     `/predictions/items/${itemId}/ml-next-price`,
+  );
+}
+
+export function compareItemPricePredictions(
+  itemId: number,
+  window = 3,
+): Promise<ItemPredictionComparison> {
+  return apiRequest<ItemPredictionComparison>(
+    `/predictions/items/${itemId}/compare?window=${window}`,
   );
 }

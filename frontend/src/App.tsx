@@ -40,6 +40,7 @@ import {
   listIndicators,
 } from "./api/indicators";
 import {
+  compareItemPricePredictions,
   predictNextBasketTotal,
   predictNextItemPrice,
   predictNextItemPriceWithMl,
@@ -58,6 +59,7 @@ import type { PriceObservation } from "./types/price";
 import type { PublicIndicator } from "./types/indicators";
 import type {
   BasketTotalPrediction,
+  ItemPredictionComparison,
   ItemPricePrediction,
   MLItemPricePrediction,
   PriceModelTrainingResult,
@@ -178,6 +180,8 @@ export default function App() {
     useState<MLItemPricePrediction | null>(null);
   const [modelTrainingResult, setModelTrainingResult] =
     useState<PriceModelTrainingResult | null>(null);
+  const [predictionComparison, setPredictionComparison] =
+    useState<ItemPredictionComparison | null>(null);
 
   const itemNameById = useMemo(() => {
     return new Map(items.map((item) => [item.id, item.name]));
@@ -798,25 +802,24 @@ export default function App() {
 
   async function handlePredictionItemChange(itemId: string) {
     setSelectedPredictionItemId(itemId);
+
     await handlePredictItemPrice(itemId);
     await handlePredictItemPriceWithMl(itemId);
+    await handleComparePredictions(itemId);
   }
 
   async function handlePredictionWindowChange(windowValue: string) {
     setPredictionWindow(windowValue);
 
+    const windowSize = Number(windowValue) || 3;
+
     try {
-      const nextBasketPrediction = await predictNextBasketTotal(
-        Number(windowValue) || 3,
-      );
+      const nextBasketPrediction = await predictNextBasketTotal(windowSize);
       setBasketPrediction(nextBasketPrediction);
 
       if (selectedPredictionItemId) {
-        const nextItemPrediction = await predictNextItemPrice(
-          Number(selectedPredictionItemId),
-          Number(windowValue) || 3,
-        );
-        setItemPrediction(nextItemPrediction);
+        await handlePredictItemPrice(selectedPredictionItemId);
+        await handleComparePredictions(selectedPredictionItemId);
       }
     } catch (currentError) {
       setError(
@@ -836,10 +839,8 @@ export default function App() {
       setModelTrainingResult(result);
 
       if (selectedPredictionItemId) {
-        const prediction = await predictNextItemPriceWithMl(
-          Number(selectedPredictionItemId),
-        );
-        setMlItemPrediction(prediction);
+        await handlePredictItemPriceWithMl(selectedPredictionItemId);
+        await handleComparePredictions(selectedPredictionItemId);
       }
     } catch (currentError) {
       setError(
@@ -867,12 +868,33 @@ export default function App() {
     try {
       const prediction = await predictNextItemPriceWithMl(itemId);
       setMlItemPrediction(prediction);
-    } catch (currentError) {
+    } catch {
       setMlItemPrediction(null);
+    }
+  }
+
+  async function handleComparePredictions(
+    itemIdValue = selectedPredictionItemId,
+  ) {
+    const itemId = Number(itemIdValue);
+    const windowSize = Number(predictionWindow) || 3;
+
+    if (!itemId) {
+      setPredictionComparison(null);
+      return;
+    }
+
+    setError(null);
+
+    try {
+      const comparison = await compareItemPricePredictions(itemId, windowSize);
+      setPredictionComparison(comparison);
+    } catch (currentError) {
+      setPredictionComparison(null);
       setError(
         currentError instanceof Error
           ? currentError.message
-          : "Failed to get ML price prediction",
+          : "Failed to compare predictions",
       );
     }
   }
@@ -1215,8 +1237,8 @@ export default function App() {
                 <div>
                   <h2 className="section-title mb-1">Forecast baseline</h2>
                   <p className="text-sm text-[#6b6254]">
-                    Simple moving-average predictions before training full ML
-                    models.
+                    Compare simple moving-average forecasts against the trained
+                    ML model.
                   </p>
                 </div>
 
@@ -1235,10 +1257,10 @@ export default function App() {
                 </label>
               </div>
 
-              <div className="grid gap-4 lg:grid-cols-[0.8fr_1.2fr]">
+              <div className="grid gap-4 lg:grid-cols-3">
                 <div className="rounded-2xl border border-[#eee6d6] bg-white p-4">
                   <h3 className="mb-3 text-sm font-black uppercase tracking-wide text-[#6b6254]">
-                    Item next price
+                    Item prediction
                   </h3>
 
                   <label className="form-label">
@@ -1270,18 +1292,8 @@ export default function App() {
                         )}
                       </p>
                       <p className="mt-2 text-sm text-[#6b6254]">
-                        Per {itemPrediction.unit} ·{" "}
-                        {itemPrediction.observations_used} observations ·{" "}
-                        {itemPrediction.confidence} confidence
-                      </p>
-                      <p className="mt-2 text-sm text-[#6b6254]">
-                        Latest:{" "}
-                        {currencyFormatter.format(
-                          itemPrediction.latest_price_per_unit,
-                        )}
-                        {itemPrediction.latest_change_percent === null
-                          ? ""
-                          : ` (${itemPrediction.latest_change_percent}%)`}
+                        Moving average · {itemPrediction.observations_used}{" "}
+                        observations · {itemPrediction.confidence} confidence
                       </p>
                     </div>
                   ) : (
@@ -1292,112 +1304,162 @@ export default function App() {
                 </div>
 
                 <div className="rounded-2xl border border-[#eee6d6] bg-white p-4">
-                  <div className="mb-3 flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
+                  <div className="mb-3 flex items-center justify-between gap-2">
                     <h3 className="text-sm font-black uppercase tracking-wide text-[#6b6254]">
-                      Predicted basket total
+                      ML model
                     </h3>
 
-                    <strong className="text-2xl font-black text-[#8a6d1d]">
-                      {currencyFormatter.format(
-                        basketPrediction?.predicted_total ?? 0,
-                      )}
-                    </strong>
+                    <button
+                      className="secondary-small-button"
+                      disabled={isSaving}
+                      onClick={() => void handleTrainPriceModel()}
+                    >
+                      Train
+                    </button>
                   </div>
 
-                  <div className="overflow-x-auto">
-                    <table className="data-table">
-                      <thead>
-                        <tr>
-                          <TableHead>Item</TableHead>
-                          <TableHead>Predicted/unit</TableHead>
-                          <TableHead>Line total</TableHead>
-                          <TableHead>Data</TableHead>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {basketPrediction?.items.length ? (
-                          basketPrediction.items.map((line) => (
-                            <tr key={line.basket_item_id}>
-                              <TableCell>{line.item_name}</TableCell>
-                              <TableCell>
-                                {line.predicted_price_per_unit === null
-                                  ? "—"
-                                  : currencyFormatter.format(
-                                      line.predicted_price_per_unit,
-                                    )}
-                              </TableCell>
-                              <TableCell>
-                                {line.predicted_line_total === null
-                                  ? "—"
-                                  : currencyFormatter.format(
-                                      line.predicted_line_total,
-                                    )}
-                              </TableCell>
-                              <TableCell>
-                                {line.observations_used} observations
-                              </TableCell>
-                            </tr>
-                          ))
-                        ) : (
-                          <tr>
-                            <td className="empty-cell" colSpan={4}>
-                              No basket prediction available yet.
-                            </td>
-                          </tr>
+                  {mlItemPrediction ? (
+                    <div className="rounded-2xl bg-[#f8f4ea] p-4">
+                      <p className="text-sm text-[#6b6254]">
+                        {mlItemPrediction.item_name}
+                      </p>
+                      <p className="mt-1 text-3xl font-black text-[#1f1f1f]">
+                        {currencyFormatter.format(
+                          mlItemPrediction.predicted_price_per_unit,
                         )}
-                      </tbody>
-                    </table>
+                      </p>
+                      <p className="mt-2 text-sm text-[#6b6254]">
+                        Random forest · {mlItemPrediction.model.training_rows}{" "}
+                        training rows
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl bg-[#f8f4ea] p-4 text-sm text-[#6b6254]">
+                      Train the model, then select an item.
+                    </div>
+                  )}
+
+                  {modelTrainingResult ? (
+                    <p className="mt-3 text-xs text-[#6b6254]">
+                      Last trained with {modelTrainingResult.training_rows}{" "}
+                      rows.
+                    </p>
+                  ) : null}
+                </div>
+
+                <div className="rounded-2xl border border-[#eee6d6] bg-white p-4">
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <h3 className="text-sm font-black uppercase tracking-wide text-[#6b6254]">
+                      Baseline vs ML
+                    </h3>
+
+                    <button
+                      className="secondary-small-button"
+                      disabled={isSaving || !selectedPredictionItemId}
+                      onClick={() => void handleComparePredictions()}
+                    >
+                      Compare
+                    </button>
                   </div>
+
+                  {predictionComparison ? (
+                    <div className="grid gap-3">
+                      <div className="rounded-2xl bg-[#f8f4ea] p-4">
+                        <p className="text-xs font-black uppercase tracking-wide text-[#6b6254]">
+                          Baseline
+                        </p>
+                        <p className="mt-2 text-2xl font-black text-[#1f1f1f]">
+                          {currencyFormatter.format(
+                            predictionComparison.baseline
+                              .predicted_price_per_unit,
+                          )}
+                        </p>
+                      </div>
+
+                      <div className="rounded-2xl bg-[#f8f4ea] p-4">
+                        <p className="text-xs font-black uppercase tracking-wide text-[#6b6254]">
+                          ML model
+                        </p>
+
+                        {predictionComparison.ml ? (
+                          <p className="mt-2 text-2xl font-black text-[#1f1f1f]">
+                            {currencyFormatter.format(
+                              predictionComparison.ml.predicted_price_per_unit,
+                            )}
+                          </p>
+                        ) : (
+                          <p className="mt-2 text-sm text-[#6b6254]">
+                            {predictionComparison.ml_error ??
+                              "ML prediction unavailable"}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl bg-[#f8f4ea] p-4 text-sm text-[#6b6254]">
+                      Select an item, then compare predictions.
+                    </div>
+                  )}
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-[#eee6d6] bg-white p-4">
+              <div className="mt-4 rounded-2xl border border-[#eee6d6] bg-white p-4">
                 <div className="mb-3 flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
                   <h3 className="text-sm font-black uppercase tracking-wide text-[#6b6254]">
-                    ML price model
+                    Predicted basket total
                   </h3>
 
-                  <button
-                    className="secondary-small-button"
-                    disabled={isSaving}
-                    onClick={() => void handleTrainPriceModel()}
-                  >
-                    Train model
-                  </button>
+                  <strong className="text-2xl font-black text-[#8a6d1d]">
+                    {currencyFormatter.format(
+                      basketPrediction?.predicted_total ?? 0,
+                    )}
+                  </strong>
                 </div>
 
-                {mlItemPrediction ? (
-                  <div className="rounded-2xl bg-[#f8f4ea] p-4">
-                    <p className="text-sm text-[#6b6254]">
-                      {mlItemPrediction.item_name}
-                    </p>
-                    <p className="mt-1 text-3xl font-black text-[#1f1f1f]">
-                      {currencyFormatter.format(
-                        mlItemPrediction.predicted_price_per_unit,
+                <div className="overflow-x-auto">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <TableHead>Item</TableHead>
+                        <TableHead>Predicted/unit</TableHead>
+                        <TableHead>Line total</TableHead>
+                        <TableHead>Data</TableHead>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {basketPrediction?.items.length ? (
+                        basketPrediction.items.map((line) => (
+                          <tr key={line.basket_item_id}>
+                            <TableCell>{line.item_name}</TableCell>
+                            <TableCell>
+                              {line.predicted_price_per_unit === null
+                                ? "—"
+                                : currencyFormatter.format(
+                                    line.predicted_price_per_unit,
+                                  )}
+                            </TableCell>
+                            <TableCell>
+                              {line.predicted_line_total === null
+                                ? "—"
+                                : currencyFormatter.format(
+                                    line.predicted_line_total,
+                                  )}
+                            </TableCell>
+                            <TableCell>
+                              {line.observations_used} observations
+                            </TableCell>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td className="empty-cell" colSpan={4}>
+                            No basket prediction available yet.
+                          </td>
+                        </tr>
                       )}
-                    </p>
-                    <p className="mt-2 text-sm text-[#6b6254]">
-                      Per {mlItemPrediction.unit} · {mlItemPrediction.method}
-                    </p>
-                    <p className="mt-2 text-sm text-[#6b6254]">
-                      Training rows: {mlItemPrediction.model.training_rows}
-                    </p>
-                    <p className="mt-2 text-sm text-[#6b6254]">
-                      MAE: {mlItemPrediction.model.metrics.mae ?? "—"} · R²:{" "}
-                      {mlItemPrediction.model.metrics.r2 ?? "—"}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="rounded-2xl bg-[#f8f4ea] p-4 text-sm text-[#6b6254]">
-                    Train the model, then select an item with price history.
-                  </div>
-                )}
-
-                {modelTrainingResult ? (
-                  <p className="mt-3 text-xs text-[#6b6254]">
-                    Last trained with {modelTrainingResult.training_rows} rows.
-                  </p>
-                ) : null}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </section>
 
