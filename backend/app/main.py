@@ -12,6 +12,7 @@ from app.routes import (
     items,
     predictions,
     prices,
+    raw_collections,
 )
 
 app = FastAPI(title="Kwacha API", version="0.1.0")
@@ -42,3 +43,4 @@ app.include_router(export.router)
 app.include_router(imports.router)
 app.include_router(indicators.router)
 app.include_router(predictions.router)
+app.include_router(raw_collections.router)

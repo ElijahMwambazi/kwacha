@@ -49,6 +49,12 @@ import {
   resetPriceModel,
   trainPriceModel,
 } from "./api/predictions";
+import {
+  approveRawCollection,
+  createRawCollection,
+  listRawCollections,
+  rejectRawCollection,
+} from "./api/rawCollections";
 import type {
   AnalyticsSummary,
   BasketInflationPoint,
@@ -69,6 +75,7 @@ import type {
   PriceModelStatus,
   PriceModelTrainingResult,
 } from "./types/prediction";
+import type { RawCollection } from "./types/rawCollection";
 
 type ItemFormState = {
   name: string;
@@ -98,6 +105,19 @@ type IndicatorFormState = {
   unit: string;
   source: string;
   observed_at: string;
+};
+
+type RawCollectionFormState = {
+  item_name: string;
+  category: string;
+  brand: string;
+  shop_name: string;
+  location: string;
+  price: string;
+  quantity: string;
+  unit: string;
+  source: string;
+  notes: string;
 };
 
 const initialItemForm: ItemFormState = {
@@ -139,6 +159,19 @@ const dateFormatter = new Intl.DateTimeFormat("en-ZM", {
   dateStyle: "medium",
   timeStyle: "short",
 });
+
+const initialRawCollectionForm: RawCollectionFormState = {
+  item_name: "",
+  category: "",
+  brand: "",
+  shop_name: "",
+  location: "",
+  price: "",
+  quantity: "1",
+  unit: "unit",
+  source: "",
+  notes: "",
+};
 
 export default function App() {
   const [items, setItems] = useState<Item[]>([]);
@@ -193,6 +226,10 @@ export default function App() {
     ModelTrainingRun[]
   >([]);
 
+  const [rawCollections, setRawCollections] = useState<RawCollection[]>([]);
+  const [rawCollectionForm, setRawCollectionForm] =
+    useState<RawCollectionFormState>(initialRawCollectionForm);
+
   const itemNameById = useMemo(() => {
     return new Map(items.map((item) => [item.id, item.name]));
   }, [items]);
@@ -243,6 +280,7 @@ export default function App() {
       nextBasketPrediction,
       nextPriceModelStatus,
       nextModelTrainingRuns,
+      nextRawCollections,
     ] = await Promise.all([
       listItems(),
       listPriceObservations(),
@@ -257,6 +295,7 @@ export default function App() {
       predictNextBasketTotal(Number(predictionWindow) || 3).catch(() => null),
       getPriceModelStatus(),
       listPriceModelTrainingRuns(),
+      listRawCollections("pending"),
     ]);
 
     setItems(nextItems);
@@ -272,6 +311,7 @@ export default function App() {
     setBasketPrediction(nextBasketPrediction);
     setPriceModelStatus(nextPriceModelStatus);
     setModelTrainingRuns(nextModelTrainingRuns);
+    setRawCollections(nextRawCollections);
   }
 
   useEffect(() => {
@@ -958,6 +998,96 @@ export default function App() {
     }
   }
 
+  async function handleCreateRawCollection(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const price = Number(rawCollectionForm.price);
+    const quantity = Number(rawCollectionForm.quantity);
+
+    if (
+      !rawCollectionForm.item_name.trim() ||
+      !rawCollectionForm.shop_name.trim() ||
+      !price ||
+      !quantity
+    ) {
+      setError("Raw item name, shop, price, and quantity are required");
+      return;
+    }
+
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      await createRawCollection({
+        item_name: rawCollectionForm.item_name.trim(),
+        category: rawCollectionForm.category.trim() || null,
+        brand: rawCollectionForm.brand.trim() || null,
+        shop_name: rawCollectionForm.shop_name.trim(),
+        location: rawCollectionForm.location.trim() || null,
+        price,
+        quantity,
+        unit: rawCollectionForm.unit.trim() || "unit",
+        source: rawCollectionForm.source.trim() || null,
+        notes: rawCollectionForm.notes.trim() || null,
+      });
+
+      setRawCollectionForm(initialRawCollectionForm);
+      await refreshData();
+    } catch (currentError) {
+      setError(
+        currentError instanceof Error
+          ? currentError.message
+          : "Failed to create raw collection",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleApproveRawCollection(raw: RawCollection) {
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      await approveRawCollection(raw.id);
+      await refreshData();
+    } catch (currentError) {
+      setError(
+        currentError instanceof Error
+          ? currentError.message
+          : "Failed to approve raw collection",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleRejectRawCollection(raw: RawCollection) {
+    const confirmed = window.confirm(
+      `Reject raw collection for "${raw.item_name}"?`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      await rejectRawCollection(raw.id);
+      await refreshData();
+    } catch (currentError) {
+      setError(
+        currentError instanceof Error
+          ? currentError.message
+          : "Failed to reject raw collection",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   return (
     <main className="min-h-screen bg-[#f8f4ea] px-4 py-6 text-[#1f1f1f] sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl">
@@ -1062,6 +1192,7 @@ export default function App() {
               />
             </section>
 
+            {/* Price analytics */}
             <section className="card">
               <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
                 <div>
@@ -1177,6 +1308,7 @@ export default function App() {
               </div>
             </section>
 
+            {/* Basket inflation */}
             <section className="card">
               <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
                 <div>
@@ -1291,6 +1423,7 @@ export default function App() {
               </div>
             </section>
 
+            {/* Forecast baseline */}
             <section className="card">
               <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
                 <div>
@@ -1580,6 +1713,7 @@ export default function App() {
               </div>
             </section>
 
+            {/* Indicator trends */}
             <section className="card">
               <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
                 <div>
@@ -1705,6 +1839,7 @@ export default function App() {
               </div>
             </section>
 
+            {/* Public indicators */}
             <section className="card">
               <div className="mb-4">
                 <h2 className="section-title mb-1">Public indicators</h2>
@@ -1861,6 +1996,7 @@ export default function App() {
               </div>
             </section>
 
+            {/* Add item, price observation, and basket item forms */}
             <section className="mb-4 grid gap-4 lg:grid-cols-3">
               <form className="card" onSubmit={handleCreateItem}>
                 <h2 className="section-title">Add item</h2>
@@ -2043,6 +2179,211 @@ export default function App() {
               </form>
             </section>
 
+            {/* Pending review queue */}
+            <section className="card">
+              <div className="mb-4">
+                <h2 className="section-title mb-1">Pending review queue</h2>
+                <p className="text-sm text-[#6b6254]">
+                  Review raw collected prices before they become approved price
+                  observations.
+                </p>
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-[0.8fr_1.2fr]">
+                <form
+                  className="rounded-2xl border border-[#eee6d6] bg-white p-4"
+                  onSubmit={handleCreateRawCollection}
+                >
+                  <h3 className="mb-3 text-sm font-black uppercase tracking-wide text-[#6b6254]">
+                    Add raw price
+                  </h3>
+
+                  <TextInput
+                    label="Item name"
+                    value={rawCollectionForm.item_name}
+                    onChange={(value) =>
+                      setRawCollectionForm((current) => ({
+                        ...current,
+                        item_name: value,
+                      }))
+                    }
+                    placeholder="Mealie Meal"
+                  />
+
+                  <TextInput
+                    label="Category"
+                    value={rawCollectionForm.category}
+                    onChange={(value) =>
+                      setRawCollectionForm((current) => ({
+                        ...current,
+                        category: value,
+                      }))
+                    }
+                    placeholder="Food"
+                  />
+
+                  <TextInput
+                    label="Brand"
+                    value={rawCollectionForm.brand}
+                    onChange={(value) =>
+                      setRawCollectionForm((current) => ({
+                        ...current,
+                        brand: value,
+                      }))
+                    }
+                    placeholder="Optional"
+                  />
+
+                  <TextInput
+                    label="Shop"
+                    value={rawCollectionForm.shop_name}
+                    onChange={(value) =>
+                      setRawCollectionForm((current) => ({
+                        ...current,
+                        shop_name: value,
+                      }))
+                    }
+                    placeholder="Shoprite"
+                  />
+
+                  <TextInput
+                    label="Location"
+                    value={rawCollectionForm.location}
+                    onChange={(value) =>
+                      setRawCollectionForm((current) => ({
+                        ...current,
+                        location: value,
+                      }))
+                    }
+                    placeholder="Lusaka"
+                  />
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <TextInput
+                      label="Price"
+                      type="number"
+                      value={rawCollectionForm.price}
+                      onChange={(value) =>
+                        setRawCollectionForm((current) => ({
+                          ...current,
+                          price: value,
+                        }))
+                      }
+                      placeholder="250"
+                    />
+
+                    <TextInput
+                      label="Quantity"
+                      type="number"
+                      value={rawCollectionForm.quantity}
+                      onChange={(value) =>
+                        setRawCollectionForm((current) => ({
+                          ...current,
+                          quantity: value,
+                        }))
+                      }
+                    />
+                  </div>
+
+                  <TextInput
+                    label="Unit"
+                    value={rawCollectionForm.unit}
+                    onChange={(value) =>
+                      setRawCollectionForm((current) => ({
+                        ...current,
+                        unit: value,
+                      }))
+                    }
+                    placeholder="kg"
+                  />
+
+                  <TextInput
+                    label="Source"
+                    value={rawCollectionForm.source}
+                    onChange={(value) =>
+                      setRawCollectionForm((current) => ({
+                        ...current,
+                        source: value,
+                      }))
+                    }
+                    placeholder="Manual, CSV, website"
+                  />
+
+                  <button className="primary-button" disabled={isSaving}>
+                    Add to review queue
+                  </button>
+                </form>
+
+                <div className="rounded-2xl border border-[#eee6d6] bg-white p-4">
+                  <h3 className="mb-3 text-sm font-black uppercase tracking-wide text-[#6b6254]">
+                    Pending prices
+                  </h3>
+
+                  <div className="overflow-x-auto">
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <TableHead>Item</TableHead>
+                          <TableHead>Shop</TableHead>
+                          <TableHead>Price</TableHead>
+                          <TableHead>Source</TableHead>
+                          <TableHead>Action</TableHead>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rawCollections.length ? (
+                          rawCollections.map((raw) => (
+                            <tr key={raw.id}>
+                              <TableCell>{raw.item_name}</TableCell>
+                              <TableCell>
+                                {raw.shop_name}
+                                {raw.location ? `, ${raw.location}` : ""}
+                              </TableCell>
+                              <TableCell>
+                                {currencyFormatter.format(raw.price)} /{" "}
+                                {raw.quantity} {raw.unit}
+                              </TableCell>
+                              <TableCell>{raw.source ?? "—"}</TableCell>
+                              <TableCell>
+                                <div className="flex gap-2">
+                                  <button
+                                    className="secondary-small-button"
+                                    disabled={isSaving}
+                                    onClick={() =>
+                                      void handleApproveRawCollection(raw)
+                                    }
+                                  >
+                                    Approve
+                                  </button>
+
+                                  <button
+                                    className="danger-button"
+                                    disabled={isSaving}
+                                    onClick={() =>
+                                      void handleRejectRawCollection(raw)
+                                    }
+                                  >
+                                    Reject
+                                  </button>
+                                </div>
+                              </TableCell>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td className="empty-cell" colSpan={5}>
+                              No pending raw prices.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {/* Items */}
             <section className="card">
               <h2 className="section-title">Items</h2>
 
@@ -2098,6 +2439,7 @@ export default function App() {
               </div>
             </section>
 
+            {/* Basket total */}
             <section className="card">
               <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
                 <h2 className="section-title mb-0">Basket total</h2>
@@ -2176,6 +2518,7 @@ export default function App() {
               </div>
             </section>
 
+            {/* Recent price observations */}
             <section className="card">
               <h2 className="section-title">Recent price observations</h2>
 
