@@ -4,6 +4,7 @@ import type {
   ItemPredictionComparison,
   ItemPricePrediction,
   MLItemPricePrediction,
+  ModelTrainingRun,
   PriceModelStatus,
   PriceModelTrainingResult,
 } from "../types/prediction";
@@ -59,4 +60,10 @@ export function resetPriceModel(): Promise<PriceModelStatus> {
   return apiRequest<PriceModelStatus>("/predictions/price-model", {
     method: "DELETE",
   });
+}
+
+export function listPriceModelTrainingRuns(): Promise<ModelTrainingRun[]> {
+  return apiRequest<ModelTrainingRun[]>(
+    "/predictions/price-model/training-runs",
+  );
 }

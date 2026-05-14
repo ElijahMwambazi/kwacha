@@ -12,6 +12,7 @@ from app.ml.price_model import (
     predict_next_price_with_model,
     train_price_model,
 )
+from app.models.model_training_run import ModelTrainingRun
 
 router = APIRouter(prefix="/predictions", tags=["predictions"])
 
@@ -184,6 +185,19 @@ def predict_next_basket_total(
 @router.get("/price-model/status")
 def get_price_prediction_model_status() -> dict[str, Any]:
     return get_price_model_status()
+
+@router.get("/price-model/training-runs")
+def list_price_model_training_runs(
+    session: Session = Depends(get_session),
+) -> list[ModelTrainingRun]:
+    return session.exec(
+        select(ModelTrainingRun)
+        .where(ModelTrainingRun.model_name == "price_model")
+        .order_by(
+            ModelTrainingRun.created_at.desc(),
+            ModelTrainingRun.id.desc(),
+        )
+    ).all()
 
 
 @router.delete("/price-model", status_code=status.HTTP_200_OK)

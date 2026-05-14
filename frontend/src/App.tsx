@@ -42,6 +42,7 @@ import {
 import {
   compareItemPricePredictions,
   getPriceModelStatus,
+  listPriceModelTrainingRuns,
   predictNextBasketTotal,
   predictNextItemPrice,
   predictNextItemPriceWithMl,
@@ -64,6 +65,7 @@ import type {
   ItemPredictionComparison,
   ItemPricePrediction,
   MLItemPricePrediction,
+  ModelTrainingRun,
   PriceModelStatus,
   PriceModelTrainingResult,
 } from "./types/prediction";
@@ -187,6 +189,9 @@ export default function App() {
     useState<ItemPredictionComparison | null>(null);
   const [priceModelStatus, setPriceModelStatus] =
     useState<PriceModelStatus | null>(null);
+  const [modelTrainingRuns, setModelTrainingRuns] = useState<
+    ModelTrainingRun[]
+  >([]);
 
   const itemNameById = useMemo(() => {
     return new Map(items.map((item) => [item.id, item.name]));
@@ -237,6 +242,7 @@ export default function App() {
       nextIndicatorTrends,
       nextBasketPrediction,
       nextPriceModelStatus,
+      nextModelTrainingRuns,
     ] = await Promise.all([
       listItems(),
       listPriceObservations(),
@@ -250,6 +256,7 @@ export default function App() {
       getIndicatorTrends(indicatorName),
       predictNextBasketTotal(Number(predictionWindow) || 3).catch(() => null),
       getPriceModelStatus(),
+      listPriceModelTrainingRuns(),
     ]);
 
     setItems(nextItems);
@@ -264,6 +271,7 @@ export default function App() {
     setIndicatorTrends(nextIndicatorTrends);
     setBasketPrediction(nextBasketPrediction);
     setPriceModelStatus(nextPriceModelStatus);
+    setModelTrainingRuns(nextModelTrainingRuns);
   }
 
   useEffect(() => {
@@ -846,6 +854,12 @@ export default function App() {
       const result = await trainPriceModel();
       setModelTrainingResult(result);
 
+      const status = await getPriceModelStatus();
+      setPriceModelStatus(status);
+
+      const runs = await listPriceModelTrainingRuns();
+      setModelTrainingRuns(runs);
+
       if (selectedPredictionItemId) {
         await handlePredictItemPriceWithMl(selectedPredictionItemId);
         await handleComparePredictions(selectedPredictionItemId);
@@ -875,7 +889,9 @@ export default function App() {
       const status = await resetPriceModel();
 
       setPriceModelStatus(status);
+      setModelTrainingRuns([]);
       setMlItemPrediction(null);
+      setModelTrainingResult(null);
       setPredictionComparison((current) =>
         current
           ? {
@@ -1460,6 +1476,47 @@ export default function App() {
                       Select an item, then compare predictions.
                     </div>
                   )}
+                </div>
+
+                <div className="rounded-2xl border border-[#eee6d6] bg-white p-4">
+                  <h3 className="mb-3 text-sm font-black uppercase tracking-wide text-[#6b6254]">
+                    Training runs
+                  </h3>
+
+                  <div className="overflow-x-auto">
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <TableHead>Run</TableHead>
+                          <TableHead>Rows</TableHead>
+                          <TableHead>MAE</TableHead>
+                          <TableHead>R²</TableHead>
+                          <TableHead>Created</TableHead>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {modelTrainingRuns.length ? (
+                          modelTrainingRuns.slice(0, 5).map((run) => (
+                            <tr key={run.id}>
+                              <TableCell>#{run.id}</TableCell>
+                              <TableCell>{run.training_rows}</TableCell>
+                              <TableCell>{run.mae ?? "—"}</TableCell>
+                              <TableCell>{run.r2 ?? "—"}</TableCell>
+                              <TableCell>
+                                {dateFormatter.format(new Date(run.created_at))}
+                              </TableCell>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td className="empty-cell" colSpan={5}>
+                              No model training runs yet.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
 

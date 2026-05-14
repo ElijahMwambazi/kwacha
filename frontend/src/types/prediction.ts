@@ -33,6 +33,7 @@ export type BasketTotalPrediction = {
 };
 
 export type PriceModelTrainingResult = {
+  training_run_id: number;
   model_path: string;
   trained_at: string;
   training_rows: number;
@@ -78,4 +79,16 @@ export type PriceModelStatus = {
     mae: number | null;
     r2: number | null;
   } | null;
+};
+
+export type ModelTrainingRun = {
+  id: number;
+  model_name: string;
+  model_type: string;
+  target: string;
+  training_rows: number;
+  mae: number | null;
+  r2: number | null;
+  model_path: string;
+  created_at: string;
 };

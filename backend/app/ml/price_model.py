@@ -17,6 +17,7 @@ from app.database import DATA_DIR
 from app.models.item import Item
 from app.models.price_observation import PriceObservation
 from app.models.public_indicator import PublicIndicator
+from app.models.model_training_run import ModelTrainingRun
 
 MODEL_DIR = DATA_DIR / "models"
 MODEL_DIR.mkdir(parents=True, exist_ok=True)
@@ -212,11 +213,26 @@ def train_price_model(session: Session) -> dict[str, Any]:
 
     joblib.dump(bundle, MODEL_PATH)
 
+    training_run = ModelTrainingRun(
+        model_name="price_model",
+        model_type="random_forest_regressor",
+        target=TARGET_COLUMN,
+        training_rows=len(frame),
+        mae=metrics["mae"],
+        r2=metrics["r2"],
+        model_path=str(MODEL_PATH),
+    )
+
+    session.add(training_run)
+    session.commit()
+    session.refresh(training_run)
+
     return {
-        "model_path": str(MODEL_PATH),
-        "trained_at": bundle["trained_at"],
-        "training_rows": len(frame),
-        "metrics": metrics,
+    "training_run_id": training_run.id,
+    "model_path": str(MODEL_PATH),
+    "trained_at": training_run.created_at,
+    "training_rows": len(frame),
+    "metrics": metrics,
     }
 
 
