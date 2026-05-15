@@ -10,6 +10,7 @@ from sqlmodel import Session, select
 from app.database import get_session
 from app.models.item import Item
 from app.models.price_observation import PriceObservation
+from app.models.raw_collection import RawCollection
 
 router = APIRouter(prefix="/imports", tags=["imports"])
 
@@ -331,4 +332,132 @@ async def import_price_observations_csv(
     return {
         "imported_count": imported_count,
         "created_item_count": created_item_count,
+    }
+
+@router.post("/raw-prices.csv", status_code=status.HTTP_201_CREATED)
+async def import_raw_price_collections_csv(
+    file: UploadFile = File(...),
+    session: Session = Depends(get_session),
+) -> dict[str, Any]:
+    if not file.filename or not file.filename.endswith(".csv"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only .csv files are supported",
+        )
+
+    content = await file.read()
+
+    try:
+        text = content.decode("utf-8-sig")
+    except UnicodeDecodeError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="CSV must be UTF-8 encoded",
+        ) from error
+
+    reader = csv.DictReader(StringIO(text))
+
+    if not reader.fieldnames:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="CSV has no header row",
+        )
+
+    fieldnames = {field.strip() for field in reader.fieldnames if field}
+    missing_columns = REQUIRED_PRICE_COLUMNS - fieldnames
+
+    if missing_columns:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Missing required columns: {', '.join(sorted(missing_columns))}",
+        )
+
+    parsed_rows: list[dict[str, Any]] = []
+    errors: list[dict[str, Any]] = []
+
+    for row_number, row in enumerate(reader, start=2):
+        try:
+            item_name = (row.get("item_name") or "").strip()
+
+            if not item_name:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="item_name is required",
+                )
+
+            shop_name = (row.get("shop_name") or "").strip()
+
+            if not shop_name:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="shop_name is required",
+                )
+
+            price = parse_positive_float(row.get("price"), "price")
+            quantity = parse_positive_float(row.get("quantity"), "quantity")
+            unit = (row.get("unit") or "unit").strip() or "unit"
+
+            parsed_rows.append(
+                {
+                    "item_name": item_name,
+                    "category": parse_optional_text(row.get("category")),
+                    "brand": parse_optional_text(row.get("brand")),
+                    "shop_name": shop_name,
+                    "location": parse_optional_text(row.get("location")),
+                    "price": price,
+                    "quantity": quantity,
+                    "unit": unit,
+                    "source": parse_optional_text(row.get("source")) or "csv_import",
+                    "notes": parse_optional_text(row.get("notes")),
+                    "collected_at": parse_observed_at(row.get("observed_at")),
+                }
+            )
+
+        except HTTPException as error:
+            errors.append(
+                {
+                    "row": row_number,
+                    "detail": error.detail,
+                }
+            )
+        except Exception as error:
+            errors.append(
+                {
+                    "row": row_number,
+                    "detail": str(error),
+                }
+            )
+
+    if errors:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Raw CSV import failed. No rows were imported.",
+                "errors": errors,
+            },
+        )
+
+    for parsed_row in parsed_rows:
+        raw = RawCollection(
+            item_name=parsed_row["item_name"],
+            category=parsed_row["category"],
+            brand=parsed_row["brand"],
+            shop_name=parsed_row["shop_name"],
+            location=parsed_row["location"],
+            price=parsed_row["price"],
+            quantity=parsed_row["quantity"],
+            unit=parsed_row["unit"],
+            source=parsed_row["source"],
+            notes=parsed_row["notes"],
+            collected_at=parsed_row["collected_at"],
+            status="pending",
+        )
+
+        session.add(raw)
+
+    session.commit()
+
+    return {
+        "imported_count": len(parsed_rows),
+        "status": "pending_review",
     }

@@ -33,6 +33,7 @@ import { downloadCsv, type ExportKind } from "./api/export";
 import {
   downloadImportTemplate,
   importPriceObservationsCsv,
+  importRawPriceCollectionsCsv,
 } from "./api/imports";
 import {
   createIndicator,
@@ -751,6 +752,38 @@ export default function App() {
     }
   }
 
+  async function handleImportRawPricesCsv(
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) {
+    const file = event.target.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      const result = await importRawPriceCollectionsCsv(file);
+
+      await refreshData();
+
+      window.alert(
+        `Imported ${result.imported_count} raw price rows into the pending review queue.`,
+      );
+    } catch (currentError) {
+      setError(
+        currentError instanceof Error
+          ? currentError.message
+          : "Failed to import raw price CSV",
+      );
+    } finally {
+      event.target.value = "";
+      setIsSaving(false);
+    }
+  }
+
   async function handleIndicatorTrendChange(name: string) {
     setSelectedIndicatorName(name);
 
@@ -1142,6 +1175,17 @@ export default function App() {
                 accept=".csv,text/csv"
                 disabled={isSaving}
                 onChange={(event) => void handleImportPricesCsv(event)}
+              />
+            </label>
+
+            <label className="w-fit cursor-pointer rounded-xl border border-[#d8cdb7] bg-[#fffdf8] px-4 py-2.5 font-bold text-[#1f1f1f] shadow-sm transition hover:bg-white">
+              Import raw prices
+              <input
+                className="hidden"
+                type="file"
+                accept=".csv,text/csv"
+                disabled={isSaving}
+                onChange={(event) => void handleImportRawPricesCsv(event)}
               />
             </label>
 

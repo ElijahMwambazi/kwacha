@@ -9,6 +9,11 @@ export type ImportPriceCsvResult = {
 
 export type ImportTemplateKind = "prices";
 
+export type ImportRawPriceCsvResult = {
+  imported_count: number;
+  status: "pending_review";
+};
+
 export async function importPriceObservationsCsv(
   file: File,
 ): Promise<ImportPriceCsvResult> {
@@ -61,4 +66,36 @@ export async function downloadImportTemplate(
   link.remove();
 
   window.URL.revokeObjectURL(url);
+}
+
+export async function importRawPriceCollectionsCsv(
+  file: File,
+): Promise<ImportRawPriceCsvResult> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await fetch(`${API_BASE_URL}/imports/raw-prices.csv`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    let message = `Raw CSV import failed: ${response.status}`;
+
+    try {
+      const error = await response.json();
+
+      if (typeof error.detail === "string") {
+        message = error.detail;
+      } else if (error.detail?.message) {
+        message = error.detail.message;
+      }
+    } catch {
+      // Keep fallback message.
+    }
+
+    throw new Error(message);
+  }
+
+  return response.json() as Promise<ImportRawPriceCsvResult>;
 }
