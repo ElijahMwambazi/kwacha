@@ -58,6 +58,7 @@ import {
   getRawCollectionStats,
   listRawCollections,
   rejectRawCollection,
+  updateRawCollection,
 } from "./api/rawCollections";
 import type {
   AnalyticsSummary,
@@ -1197,6 +1198,115 @@ export default function App() {
         currentError instanceof Error
           ? currentError.message
           : "Failed to reject raw collection",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleEditRawCollection(raw: RawCollection) {
+    if (raw.status !== "pending") {
+      setError("Only pending raw rows can be edited");
+      return;
+    }
+
+    const itemName = window.prompt("Item name", raw.item_name);
+
+    if (itemName === null) {
+      return;
+    }
+
+    const category = window.prompt("Category", raw.category ?? "");
+
+    if (category === null) {
+      return;
+    }
+
+    const brand = window.prompt("Brand", raw.brand ?? "");
+
+    if (brand === null) {
+      return;
+    }
+
+    const shopName = window.prompt("Shop", raw.shop_name);
+
+    if (shopName === null) {
+      return;
+    }
+
+    const location = window.prompt("Location", raw.location ?? "");
+
+    if (location === null) {
+      return;
+    }
+
+    const priceValue = window.prompt("Price", String(raw.price));
+
+    if (priceValue === null) {
+      return;
+    }
+
+    const quantityValue = window.prompt("Quantity", String(raw.quantity));
+
+    if (quantityValue === null) {
+      return;
+    }
+
+    const unit = window.prompt("Unit", raw.unit);
+
+    if (unit === null) {
+      return;
+    }
+
+    const source = window.prompt("Source", raw.source ?? "");
+
+    if (source === null) {
+      return;
+    }
+
+    const notes = window.prompt("Notes", raw.notes ?? "");
+
+    if (notes === null) {
+      return;
+    }
+
+    const price = Number(priceValue);
+    const quantity = Number(quantityValue);
+
+    if (
+      !itemName.trim() ||
+      !shopName.trim() ||
+      !price ||
+      !quantity ||
+      !unit.trim()
+    ) {
+      setError("Item name, shop, price, quantity, and unit are required");
+      return;
+    }
+
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      await updateRawCollection(raw.id, {
+        item_name: itemName.trim(),
+        category: category.trim() || null,
+        brand: brand.trim() || null,
+        shop_name: shopName.trim(),
+        location: location.trim() || null,
+        price,
+        quantity,
+        unit: unit.trim(),
+        source: source.trim() || null,
+        notes: notes.trim() || null,
+      });
+
+      await refreshData();
+    } catch (currentError) {
+      setError(
+        currentError instanceof Error
+          ? currentError.message
+          : "Failed to update raw collection",
       );
     } finally {
       setIsSaving(false);
@@ -2563,6 +2673,16 @@ export default function App() {
                               <TableCell>
                                 {raw.status === "pending" ? (
                                   <div className="flex gap-2">
+                                    <button
+                                      className="secondary-small-button"
+                                      disabled={isSaving}
+                                      onClick={() =>
+                                        void handleEditRawCollection(raw)
+                                      }
+                                    >
+                                      Edit
+                                    </button>
+
                                     <button
                                       className="secondary-small-button"
                                       disabled={isSaving}
