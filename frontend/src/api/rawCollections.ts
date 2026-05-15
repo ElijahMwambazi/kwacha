@@ -5,6 +5,7 @@ import type {
   BulkRejectRawCollectionsResult,
   CreateRawCollectionPayload,
   RawCollection,
+  RawCollectionStats,
   RawCollectionStatus,
   UpdateRawCollectionPayload,
 } from "../types/rawCollection";
@@ -74,4 +75,8 @@ export function bulkRejectRawCollections(): Promise<BulkRejectRawCollectionsResu
       method: "POST",
     },
   );
+}
+
+export function getRawCollectionStats(): Promise<RawCollectionStats> {
+  return apiRequest<RawCollectionStats>("/raw-collections/stats");
 }

@@ -52,3 +52,10 @@ export type BulkApproveRawCollectionsResult = {
 export type BulkRejectRawCollectionsResult = {
   rejected_count: number;
 };
+
+export type RawCollectionStats = {
+  total_count: number;
+  pending_count: number;
+  approved_count: number;
+  rejected_count: number;
+};

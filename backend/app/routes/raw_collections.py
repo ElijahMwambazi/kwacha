@@ -100,36 +100,22 @@ def list_raw_collections(
 
     return session.exec(statement).all()
 
-@router.patch("/{raw_collection_id}")
-def update_raw_collection(
-    raw_collection_id: int,
-    payload: RawCollectionUpdate,
+@router.get("/stats")
+def get_raw_collection_stats(
     session: Session = Depends(get_session),
-) -> RawCollection:
-    raw = session.get(RawCollection, raw_collection_id)
+) -> dict[str, int]:
+    rows = session.exec(select(RawCollection)).all()
 
-    if not raw:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Raw collection not found",
-        )
+    pending_count = sum(1 for row in rows if row.status == "pending")
+    approved_count = sum(1 for row in rows if row.status == "approved")
+    rejected_count = sum(1 for row in rows if row.status == "rejected")
 
-    if raw.status != "pending":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Only pending raw collections can be updated",
-        )
-
-    update_data = payload.model_dump(exclude_unset=True)
-
-    for key, value in update_data.items():
-        setattr(raw, key, value)
-
-    session.add(raw)
-    session.commit()
-    session.refresh(raw)
-
-    return raw
+    return {
+        "total_count": len(rows),
+        "pending_count": pending_count,
+        "approved_count": approved_count,
+        "rejected_count": rejected_count,
+    }
 
 @router.post("/bulk/approve", status_code=status.HTTP_201_CREATED)
 def bulk_approve_raw_collections(
@@ -214,6 +200,37 @@ def bulk_reject_raw_collections(
     return {
         "rejected_count": rejected_count,
     }
+
+@router.patch("/{raw_collection_id}")
+def update_raw_collection(
+    raw_collection_id: int,
+    payload: RawCollectionUpdate,
+    session: Session = Depends(get_session),
+) -> RawCollection:
+    raw = session.get(RawCollection, raw_collection_id)
+
+    if not raw:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Raw collection not found",
+        )
+
+    if raw.status != "pending":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only pending raw collections can be updated",
+        )
+
+    update_data = payload.model_dump(exclude_unset=True)
+
+    for key, value in update_data.items():
+        setattr(raw, key, value)
+
+    session.add(raw)
+    session.commit()
+    session.refresh(raw)
+
+    return raw
 
 @router.post("/{raw_collection_id}/approve", status_code=status.HTTP_201_CREATED)
 def approve_raw_collection(

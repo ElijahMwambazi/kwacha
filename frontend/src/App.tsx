@@ -55,6 +55,7 @@ import {
   bulkApproveRawCollections,
   bulkRejectRawCollections,
   createRawCollection,
+  getRawCollectionStats,
   listRawCollections,
   rejectRawCollection,
 } from "./api/rawCollections";
@@ -78,7 +79,11 @@ import type {
   PriceModelStatus,
   PriceModelTrainingResult,
 } from "./types/prediction";
-import type { RawCollection } from "./types/rawCollection";
+import type {
+  RawCollection,
+  RawCollectionStats,
+  RawCollectionStatus,
+} from "./types/rawCollection";
 
 type ItemFormState = {
   name: string;
@@ -232,6 +237,10 @@ export default function App() {
   const [rawCollections, setRawCollections] = useState<RawCollection[]>([]);
   const [rawCollectionForm, setRawCollectionForm] =
     useState<RawCollectionFormState>(initialRawCollectionForm);
+  const [rawCollectionStats, setRawCollectionStats] =
+    useState<RawCollectionStats | null>(null);
+  const [rawCollectionStatusFilter, setRawCollectionStatusFilter] =
+    useState<RawCollectionStatus>("pending");
 
   const itemNameById = useMemo(() => {
     return new Map(items.map((item) => [item.id, item.name]));
@@ -284,6 +293,7 @@ export default function App() {
       nextPriceModelStatus,
       nextModelTrainingRuns,
       nextRawCollections,
+      nextRawCollectionStats,
     ] = await Promise.all([
       listItems(),
       listPriceObservations(),
@@ -298,7 +308,8 @@ export default function App() {
       predictNextBasketTotal(Number(predictionWindow) || 3).catch(() => null),
       getPriceModelStatus(),
       listPriceModelTrainingRuns(),
-      listRawCollections("pending"),
+      listRawCollections(rawCollectionStatusFilter),
+      getRawCollectionStats(),
     ]);
 
     setItems(nextItems);
@@ -315,6 +326,7 @@ export default function App() {
     setPriceModelStatus(nextPriceModelStatus);
     setModelTrainingRuns(nextModelTrainingRuns);
     setRawCollections(nextRawCollections);
+    setRawCollectionStats(nextRawCollectionStats);
   }
 
   useEffect(() => {
@@ -1134,6 +1146,7 @@ export default function App() {
       });
 
       setRawCollectionForm(initialRawCollectionForm);
+      await handleRawCollectionStatusFilterChange(rawCollectionStatusFilter);
       await refreshData();
     } catch (currentError) {
       setError(
@@ -1187,6 +1200,29 @@ export default function App() {
       );
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  async function handleRawCollectionStatusFilterChange(
+    status: RawCollectionStatus,
+  ) {
+    setRawCollectionStatusFilter(status);
+    setError(null);
+
+    try {
+      const [nextRawCollections, nextRawCollectionStats] = await Promise.all([
+        listRawCollections(status),
+        getRawCollectionStats(),
+      ]);
+
+      setRawCollections(nextRawCollections);
+      setRawCollectionStats(nextRawCollectionStats);
+    } catch (currentError) {
+      setError(
+        currentError instanceof Error
+          ? currentError.message
+          : "Failed to load raw collection review queue",
+      );
     }
   }
 
@@ -2296,7 +2332,7 @@ export default function App() {
             <section className="card">
               <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
                 <div>
-                  <h2 className="section-title mb-1">Pending review queue</h2>
+                  <h2 className="section-title mb-1">Raw price review queue</h2>
                   <p className="text-sm text-[#6b6254]">
                     Review raw collected prices before they become approved
                     price observations.
@@ -2306,7 +2342,11 @@ export default function App() {
                 <div className="flex flex-wrap gap-2">
                   <button
                     className="secondary-small-button"
-                    disabled={isSaving || !rawCollections.length}
+                    disabled={
+                      isSaving ||
+                      !rawCollections.length ||
+                      rawCollectionStatusFilter !== "pending"
+                    }
                     onClick={() => void handleBulkApproveRawCollections()}
                   >
                     Approve all
@@ -2314,12 +2354,55 @@ export default function App() {
 
                   <button
                     className="danger-button"
-                    disabled={isSaving || !rawCollections.length}
+                    disabled={
+                      isSaving ||
+                      !rawCollections.length ||
+                      rawCollectionStatusFilter !== "pending"
+                    }
                     onClick={() => void handleBulkRejectRawCollections()}
                   >
                     Reject all
                   </button>
                 </div>
+              </div>
+
+              <div className="mb-4 grid gap-3 sm:grid-cols-4">
+                <StatCard
+                  label="Raw rows"
+                  value={rawCollectionStats?.total_count ?? 0}
+                />
+                <StatCard
+                  label="Pending"
+                  value={rawCollectionStats?.pending_count ?? 0}
+                />
+                <StatCard
+                  label="Approved"
+                  value={rawCollectionStats?.approved_count ?? 0}
+                />
+                <StatCard
+                  label="Rejected"
+                  value={rawCollectionStats?.rejected_count ?? 0}
+                />
+              </div>
+
+              <div className="mb-4 flex flex-wrap gap-2">
+                {(
+                  ["pending", "approved", "rejected"] as RawCollectionStatus[]
+                ).map((status) => (
+                  <button
+                    key={status}
+                    className={
+                      rawCollectionStatusFilter === status
+                        ? "rounded-lg bg-[#1f1f1f] px-3 py-1.5 text-xs font-extrabold capitalize text-white"
+                        : "secondary-small-button capitalize"
+                    }
+                    onClick={() =>
+                      void handleRawCollectionStatusFilterChange(status)
+                    }
+                  >
+                    {status}
+                  </button>
+                ))}
               </div>
 
               <div className="grid gap-4 lg:grid-cols-[0.8fr_1.2fr]">
@@ -2478,34 +2561,40 @@ export default function App() {
                               </TableCell>
                               <TableCell>{raw.source ?? "—"}</TableCell>
                               <TableCell>
-                                <div className="flex gap-2">
-                                  <button
-                                    className="secondary-small-button"
-                                    disabled={isSaving}
-                                    onClick={() =>
-                                      void handleApproveRawCollection(raw)
-                                    }
-                                  >
-                                    Approve
-                                  </button>
+                                {raw.status === "pending" ? (
+                                  <div className="flex gap-2">
+                                    <button
+                                      className="secondary-small-button"
+                                      disabled={isSaving}
+                                      onClick={() =>
+                                        void handleApproveRawCollection(raw)
+                                      }
+                                    >
+                                      Approve
+                                    </button>
 
-                                  <button
-                                    className="danger-button"
-                                    disabled={isSaving}
-                                    onClick={() =>
-                                      void handleRejectRawCollection(raw)
-                                    }
-                                  >
-                                    Reject
-                                  </button>
-                                </div>
+                                    <button
+                                      className="danger-button"
+                                      disabled={isSaving}
+                                      onClick={() =>
+                                        void handleRejectRawCollection(raw)
+                                      }
+                                    >
+                                      Reject
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <span className="text-xs font-bold capitalize text-[#6b6254]">
+                                    {raw.status}
+                                  </span>
+                                )}
                               </TableCell>
                             </tr>
                           ))
                         ) : (
                           <tr>
                             <td className="empty-cell" colSpan={5}>
-                              No pending raw prices.
+                              No {rawCollectionStatusFilter} raw prices.
                             </td>
                           </tr>
                         )}
