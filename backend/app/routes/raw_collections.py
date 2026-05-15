@@ -11,7 +11,6 @@ from app.models.raw_collection import RawCollection
 
 router = APIRouter(prefix="/raw-collections", tags=["raw collections"])
 
-
 class RawCollectionCreate(SQLModel):
     item_name: str
     category: str | None = None
@@ -25,7 +24,6 @@ class RawCollectionCreate(SQLModel):
     notes: str | None = None
     collected_at: datetime | None = None
 
-
 class RawCollectionUpdate(SQLModel):
     item_name: str | None = None
     category: str | None = None
@@ -38,7 +36,6 @@ class RawCollectionUpdate(SQLModel):
     source: str | None = None
     notes: str | None = None
     collected_at: datetime | None = None
-
 
 def get_or_create_item_from_raw(
     *,
@@ -62,7 +59,6 @@ def get_or_create_item_from_raw(
     session.refresh(item)
 
     return item
-
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 def create_raw_collection(
@@ -89,7 +85,6 @@ def create_raw_collection(
 
     return raw
 
-
 @router.get("")
 def list_raw_collections(
     status_filter: str | None = Query(default=None, alias="status"),
@@ -104,7 +99,6 @@ def list_raw_collections(
         statement = statement.where(RawCollection.status == status_filter)
 
     return session.exec(statement).all()
-
 
 @router.patch("/{raw_collection_id}")
 def update_raw_collection(
@@ -137,7 +131,89 @@ def update_raw_collection(
 
     return raw
 
+@router.post("/bulk/approve", status_code=status.HTTP_201_CREATED)
+def bulk_approve_raw_collections(
+    session: Session = Depends(get_session),
+) -> dict[str, Any]:
+    pending_rows = session.exec(
+        select(RawCollection)
+        .where(RawCollection.status == "pending")
+        .order_by(RawCollection.id.asc())
+    ).all()
 
+    approved_count = 0
+    created_items_count = 0
+    created_price_observations_count = 0
+
+    for raw in pending_rows:
+        existing_item = session.exec(
+            select(Item).where(Item.name == raw.item_name)
+        ).first()
+
+        item = existing_item
+
+        if not item:
+            item = Item(
+                name=raw.item_name,
+                category=raw.category,
+                brand=raw.brand,
+                default_unit=raw.unit,
+            )
+            session.add(item)
+            session.flush()
+            session.refresh(item)
+            created_items_count += 1
+
+        observation = PriceObservation(
+            item_id=item.id,
+            shop_name=raw.shop_name,
+            location=raw.location,
+            price=raw.price,
+            quantity=raw.quantity,
+            unit=raw.unit,
+            price_per_unit=round(raw.price / raw.quantity, 4),
+            observed_at=raw.collected_at,
+        )
+
+        raw.status = "approved"
+        raw.reviewed_at = datetime.utcnow()
+
+        session.add(observation)
+        session.add(raw)
+
+        approved_count += 1
+        created_price_observations_count += 1
+
+    session.commit()
+
+    return {
+        "approved_count": approved_count,
+        "created_items_count": created_items_count,
+        "created_price_observations_count": created_price_observations_count,
+    }
+
+@router.post("/bulk/reject")
+def bulk_reject_raw_collections(
+    session: Session = Depends(get_session),
+) -> dict[str, int]:
+    pending_rows = session.exec(
+        select(RawCollection).where(RawCollection.status == "pending")
+    ).all()
+
+    rejected_count = 0
+
+    for raw in pending_rows:
+        raw.status = "rejected"
+        raw.reviewed_at = datetime.utcnow()
+
+        session.add(raw)
+        rejected_count += 1
+
+    session.commit()
+
+    return {
+        "rejected_count": rejected_count,
+    }
 
 @router.post("/{raw_collection_id}/approve", status_code=status.HTTP_201_CREATED)
 def approve_raw_collection(
@@ -187,7 +263,6 @@ def approve_raw_collection(
         "price_observation": observation.model_dump(mode="json"),
     }
 
-
 @router.post("/{raw_collection_id}/reject")
 def reject_raw_collection(
     raw_collection_id: int,
@@ -215,7 +290,6 @@ def reject_raw_collection(
     session.refresh(raw)
 
     return raw
-
 
 @router.delete("/{raw_collection_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_raw_collection(

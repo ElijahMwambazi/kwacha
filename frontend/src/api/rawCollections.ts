@@ -1,6 +1,8 @@
 import { apiRequest } from "./client";
 import type {
   ApproveRawCollectionResult,
+  BulkApproveRawCollectionsResult,
+  BulkRejectRawCollectionsResult,
   CreateRawCollectionPayload,
   RawCollection,
   RawCollectionStatus,
@@ -54,4 +56,22 @@ export function deleteRawCollection(id: number): Promise<void> {
   return apiRequest<void>(`/raw-collections/${id}`, {
     method: "DELETE",
   });
+}
+
+export function bulkApproveRawCollections(): Promise<BulkApproveRawCollectionsResult> {
+  return apiRequest<BulkApproveRawCollectionsResult>(
+    "/raw-collections/bulk/approve",
+    {
+      method: "POST",
+    },
+  );
+}
+
+export function bulkRejectRawCollections(): Promise<BulkRejectRawCollectionsResult> {
+  return apiRequest<BulkRejectRawCollectionsResult>(
+    "/raw-collections/bulk/reject",
+    {
+      method: "POST",
+    },
+  );
 }

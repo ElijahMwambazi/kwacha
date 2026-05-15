@@ -52,6 +52,8 @@ import {
 } from "./api/predictions";
 import {
   approveRawCollection,
+  bulkApproveRawCollections,
+  bulkRejectRawCollections,
   createRawCollection,
   listRawCollections,
   rejectRawCollection,
@@ -780,6 +782,73 @@ export default function App() {
       );
     } finally {
       event.target.value = "";
+      setIsSaving(false);
+    }
+  }
+  async function handleBulkApproveRawCollections() {
+    if (!rawCollections.length) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Approve all ${rawCollections.length} pending raw price rows?`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      const result = await bulkApproveRawCollections();
+
+      await refreshData();
+
+      window.alert(
+        `Approved ${result.approved_count} rows. Created ${result.created_items_count} items and ${result.created_price_observations_count} price observations.`,
+      );
+    } catch (currentError) {
+      setError(
+        currentError instanceof Error
+          ? currentError.message
+          : "Failed to bulk approve raw collections",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleBulkRejectRawCollections() {
+    if (!rawCollections.length) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Reject all ${rawCollections.length} pending raw price rows?`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      const result = await bulkRejectRawCollections();
+
+      await refreshData();
+
+      window.alert(`Rejected ${result.rejected_count} rows.`);
+    } catch (currentError) {
+      setError(
+        currentError instanceof Error
+          ? currentError.message
+          : "Failed to bulk reject raw collections",
+      );
+    } finally {
       setIsSaving(false);
     }
   }
@@ -2225,12 +2294,32 @@ export default function App() {
 
             {/* Pending review queue */}
             <section className="card">
-              <div className="mb-4">
-                <h2 className="section-title mb-1">Pending review queue</h2>
-                <p className="text-sm text-[#6b6254]">
-                  Review raw collected prices before they become approved price
-                  observations.
-                </p>
+              <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                <div>
+                  <h2 className="section-title mb-1">Pending review queue</h2>
+                  <p className="text-sm text-[#6b6254]">
+                    Review raw collected prices before they become approved
+                    price observations.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    className="secondary-small-button"
+                    disabled={isSaving || !rawCollections.length}
+                    onClick={() => void handleBulkApproveRawCollections()}
+                  >
+                    Approve all
+                  </button>
+
+                  <button
+                    className="danger-button"
+                    disabled={isSaving || !rawCollections.length}
+                    onClick={() => void handleBulkRejectRawCollections()}
+                  >
+                    Reject all
+                  </button>
+                </div>
               </div>
 
               <div className="grid gap-4 lg:grid-cols-[0.8fr_1.2fr]">

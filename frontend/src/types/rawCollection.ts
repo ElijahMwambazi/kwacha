@@ -42,3 +42,13 @@ export type ApproveRawCollectionResult = {
   item: Item;
   price_observation: PriceObservation;
 };
+
+export type BulkApproveRawCollectionsResult = {
+  approved_count: number;
+  created_items_count: number;
+  created_price_observations_count: number;
+};
+
+export type BulkRejectRawCollectionsResult = {
+  rejected_count: number;
+};
