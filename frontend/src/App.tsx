@@ -55,6 +55,7 @@ import {
   bulkApproveRawCollections,
   bulkRejectRawCollections,
   createRawCollection,
+  deleteRawCollection,
   getRawCollectionStats,
   listRawCollections,
   rejectRawCollection,
@@ -1307,6 +1308,32 @@ export default function App() {
         currentError instanceof Error
           ? currentError.message
           : "Failed to update raw collection",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleDeleteRawCollection(raw: RawCollection) {
+    const confirmed = window.confirm(
+      `Delete raw row for "${raw.item_name}" from the review queue?`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      await deleteRawCollection(raw.id);
+      await refreshData();
+    } catch (currentError) {
+      setError(
+        currentError instanceof Error
+          ? currentError.message
+          : "Failed to delete raw collection",
       );
     } finally {
       setIsSaving(false);
@@ -2702,11 +2729,33 @@ export default function App() {
                                     >
                                       Reject
                                     </button>
+
+                                    <button
+                                      className="danger-button"
+                                      disabled={isSaving}
+                                      onClick={() =>
+                                        void handleDeleteRawCollection(raw)
+                                      }
+                                    >
+                                      Delete
+                                    </button>
                                   </div>
                                 ) : (
-                                  <span className="text-xs font-bold capitalize text-[#6b6254]">
-                                    {raw.status}
-                                  </span>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs font-bold capitalize text-[#6b6254]">
+                                      {raw.status}
+                                    </span>
+
+                                    <button
+                                      className="danger-button"
+                                      disabled={isSaving}
+                                      onClick={() =>
+                                        void handleDeleteRawCollection(raw)
+                                      }
+                                    >
+                                      Delete
+                                    </button>
+                                  </div>
                                 )}
                               </TableCell>
                             </tr>
