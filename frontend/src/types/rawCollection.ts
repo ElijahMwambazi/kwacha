@@ -47,6 +47,8 @@ export type BulkApproveRawCollectionsResult = {
   approved_count: number;
   created_items_count: number;
   created_price_observations_count: number;
+  duplicate_count: number;
+  duplicate_raw_collection_ids: number[];
 };
 
 export type BulkRejectRawCollectionsResult = {

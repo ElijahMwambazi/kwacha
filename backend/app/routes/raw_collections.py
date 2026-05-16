@@ -1,3 +1,4 @@
+from curses import raw
 from datetime import datetime
 from typing import Any
 
@@ -59,6 +60,23 @@ def get_or_create_item_from_raw(
     session.refresh(item)
 
     return item
+
+def find_duplicate_price_observation(
+    *,
+    session: Session,
+    raw: RawCollection,
+    item: Item,
+) -> PriceObservation | None:
+    return session.exec(
+        select(PriceObservation)
+        .where(PriceObservation.item_id == item.id)
+        .where(PriceObservation.shop_name == raw.shop_name)
+        .where(PriceObservation.location == raw.location)
+        .where(PriceObservation.price == raw.price)
+        .where(PriceObservation.quantity == raw.quantity)
+        .where(PriceObservation.unit == raw.unit)
+        .where(PriceObservation.observed_at == raw.collected_at)
+    ).first()
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 def create_raw_collection(
@@ -130,6 +148,8 @@ def bulk_approve_raw_collections(
     approved_count = 0
     created_items_count = 0
     created_price_observations_count = 0
+    duplicate_count = 0
+    duplicate_raw_collection_ids: list[int] = []
 
     for raw in pending_rows:
         existing_item = session.exec(
@@ -149,6 +169,24 @@ def bulk_approve_raw_collections(
             session.flush()
             session.refresh(item)
             created_items_count += 1
+
+        duplicate = find_duplicate_price_observation(
+            session=session,
+            raw=raw,
+            item=item,
+        )
+
+        if duplicate:
+            raw.status = "rejected"
+            raw.reviewed_at = datetime.utcnow()
+            raw.notes = (
+                f"{raw.notes or ''} duplicate_price_observation_id={duplicate.id}"
+            ).strip()
+
+            session.add(raw)
+            duplicate_count += 1
+            duplicate_raw_collection_ids.append(raw.id)
+            continue
 
         observation = PriceObservation(
             item_id=item.id,
@@ -176,6 +214,8 @@ def bulk_approve_raw_collections(
         "approved_count": approved_count,
         "created_items_count": created_items_count,
         "created_price_observations_count": created_price_observations_count,
+        "duplicate_count": duplicate_count,
+        "duplicate_raw_collection_ids": duplicate_raw_collection_ids,
     }
 
 @router.post("/bulk/reject")
@@ -199,6 +239,78 @@ def bulk_reject_raw_collections(
 
     return {
         "rejected_count": rejected_count,
+    }
+
+@router.post("/{raw_collection_id}/approve", status_code=status.HTTP_201_CREATED)
+def approve_raw_collection(
+    raw_collection_id: int,
+    session: Session = Depends(get_session),
+) -> dict[str, Any]:
+    raw = session.get(RawCollection, raw_collection_id)
+
+    if not raw:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Raw collection not found",
+        )
+
+    if raw.status != "pending":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only pending raw collections can be approved",
+        )
+
+    item = get_or_create_item_from_raw(session=session, raw=raw)
+
+    duplicate = find_duplicate_price_observation(
+        session=session,
+        raw=raw,
+        item=item,
+    )
+
+    if duplicate:
+        raw.status = "rejected"
+        raw.reviewed_at = datetime.utcnow()
+        raw.notes = f"{raw.notes or ''} duplicate_price_observation_id={duplicate.id}".strip()
+
+        session.add(raw)
+        session.commit()
+        session.refresh(raw)
+
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "message": "Duplicate price observation detected",
+                "price_observation_id": duplicate.id,
+                "raw_collection_id": raw.id,
+            },
+        )
+
+    observation = PriceObservation(
+        item_id=item.id,
+        shop_name=raw.shop_name,
+        location=raw.location,
+        price=raw.price,
+        quantity=raw.quantity,
+        unit=raw.unit,
+        price_per_unit=round(raw.price / raw.quantity, 4),
+        observed_at=raw.collected_at,
+    )
+
+    raw.status = "approved"
+    raw.reviewed_at = datetime.utcnow()
+
+    session.add(observation)
+    session.add(raw)
+    session.commit()
+    session.refresh(observation)
+    session.refresh(raw)
+    session.refresh(item)
+
+    return {
+        "raw_collection": raw.model_dump(mode="json"),
+        "item": item.model_dump(mode="json"),
+        "price_observation": observation.model_dump(mode="json"),
     }
 
 @router.patch("/{raw_collection_id}")
@@ -252,6 +364,30 @@ def approve_raw_collection(
         )
 
     item = get_or_create_item_from_raw(session=session, raw=raw)
+
+    duplicate = find_duplicate_price_observation(
+    session=session,
+    raw=raw,
+    item=item,
+)
+
+    if duplicate:
+        raw.status = "rejected"
+        raw.reviewed_at = datetime.utcnow()
+        raw.notes = f"{raw.notes or ''} duplicate_price_observation_id={duplicate.id}".strip()
+
+        session.add(raw)
+        session.commit()
+        session.refresh(raw)
+
+    raise HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail={
+            "message": "Duplicate price observation detected",
+            "price_observation_id": duplicate.id,
+            "raw_collection_id": raw.id,
+        },
+    )
 
     observation = PriceObservation(
         item_id=item.id,

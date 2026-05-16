@@ -813,6 +813,7 @@ export default function App() {
       setIsSaving(false);
     }
   }
+
   async function handleBulkApproveRawCollections() {
     if (!rawCollections.length) {
       return;
@@ -835,7 +836,7 @@ export default function App() {
       await refreshData();
 
       window.alert(
-        `Approved ${result.approved_count} rows. Created ${result.created_items_count} items and ${result.created_price_observations_count} price observations.`,
+        `Approved ${result.approved_count} rows. Created ${result.created_items_count} items and ${result.created_price_observations_count} price observations. Skipped ${result.duplicate_count} duplicates.`,
       );
     } catch (currentError) {
       setError(
@@ -1188,6 +1189,8 @@ export default function App() {
           ? currentError.message
           : "Failed to approve raw collection",
       );
+
+      await refreshData();
     } finally {
       setIsSaving(false);
     }
@@ -2701,6 +2704,7 @@ export default function App() {
                           <TableHead>Shop</TableHead>
                           <TableHead>Price</TableHead>
                           <TableHead>Source</TableHead>
+                          <TableHead>Notes</TableHead>
                           <TableHead>Action</TableHead>
                         </tr>
                       </thead>
@@ -2718,6 +2722,7 @@ export default function App() {
                                 {raw.quantity} {raw.unit}
                               </TableCell>
                               <TableCell>{raw.source ?? "—"}</TableCell>
+                              <TableCell>{raw.notes ?? "—"}</TableCell>
                               <TableCell>
                                 {raw.status === "pending" ? (
                                   <div className="flex gap-2">
@@ -2783,7 +2788,7 @@ export default function App() {
                           ))
                         ) : (
                           <tr>
-                            <td className="empty-cell" colSpan={5}>
+                            <td className="empty-cell" colSpan={6}>
                               No {rawCollectionStatusFilter} raw prices.
                             </td>
                           </tr>
