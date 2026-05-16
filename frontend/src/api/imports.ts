@@ -7,7 +7,7 @@ export type ImportPriceCsvResult = {
   created_item_count: number;
 };
 
-export type ImportTemplateKind = "prices";
+export type ImportTemplateKind = "prices" | "raw-prices";
 
 export type ImportRawPriceCsvResult = {
   imported_count: number;
@@ -58,9 +58,14 @@ export async function downloadImportTemplate(
   const blob = await response.blob();
   const url = window.URL.createObjectURL(blob);
 
+  const filenames: Record<ImportTemplateKind, string> = {
+    prices: "kwacha_price_import_template.csv",
+    "raw-prices": "kwacha_raw_price_import_template.csv",
+  };
+
   const link = document.createElement("a");
   link.href = url;
-  link.download = "kwacha_price_import_template.csv";
+  link.download = filenames[kind];
   document.body.appendChild(link);
   link.click();
   link.remove();

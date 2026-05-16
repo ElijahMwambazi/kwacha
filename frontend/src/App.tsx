@@ -434,6 +434,20 @@ export default function App() {
     }
   }
 
+  async function handleDownloadRawPriceImportTemplate() {
+    setError(null);
+
+    try {
+      await downloadImportTemplate("raw-prices");
+    } catch (currentError) {
+      setError(
+        currentError instanceof Error
+          ? currentError.message
+          : "Failed to download raw import template",
+      );
+    }
+  }
+
   async function handleAddBasketItem(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -1430,6 +1444,13 @@ export default function App() {
                 onChange={(event) => void handleImportRawPricesCsv(event)}
               />
             </label>
+
+            <button
+              className="w-fit rounded-xl border border-[#d8cdb7] bg-[#fffdf8] px-4 py-2.5 font-bold text-[#1f1f1f] shadow-sm transition hover:bg-white"
+              onClick={() => void handleDownloadRawPriceImportTemplate()}
+            >
+              Raw import template
+            </button>
 
             <button
               className="w-fit rounded-xl border border-[#d8cdb7] bg-[#fffdf8] px-4 py-2.5 font-bold text-[#1f1f1f] shadow-sm transition hover:bg-white"
